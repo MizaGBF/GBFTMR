@@ -10,7 +10,7 @@
             "type":"autoinput",
             "size":3,
             "anchor":"bottomleft",
-            "position":[150, 75]
+            "position":[200, -25]
         },
         {
             "type":"textinput",
@@ -39,7 +39,7 @@
             "type":"autoinput",
             "size":3,
             "anchor":"bottomleft",
-            "position":[150, 75]
+            "position":[200, -25]
         },
         {
             "type":"textinput",
@@ -68,7 +68,7 @@
             "type":"autoinput",
             "size":3,
             "anchor":"bottomleft",
-            "position":[150, 75]
+            "position":[200, -25]
         },
         {
             "type":"textinput",

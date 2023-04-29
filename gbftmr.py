@@ -334,47 +334,67 @@ class GBFTMR():
     def mulTuple(self, A:tuple, f:float): # multiply a pair by a value
         return (int(A[0]*f), int(A[1]*f))
 
+    # GBFPIB compatibility
     def getTemplateList(self):
         return list(self.template.keys())
 
     def getThumbnailOptions(self, k):
         if k not in self.template: return None
         options = {"template":copy.deepcopy(self.template[k]), "settings":{}, "choices":[]}
-        options["choices"].append(["Background", ["None"]+list(self.boss.keys()), [None]+list(self.boss.keys()), options["settings"], self.autoSetBG])
-        for e in options["template"]:
+        options["choices"].append(["Background", ["None"]+list(self.boss.keys()), [None]+list(self.boss.keys()), "settings", self.autoSetBG])
+        for i, e in enumerate(options["template"]):
             match e["type"]:
                 case "autoinput":
-                    options["choices"].append(["Auto Setting", ["Manual", "Auto", "Full Auto", "Full Auto Guard"], [None, "auto.png", "fa.png", "fa_guard.png"], e, self.autoSetAsset])
+                    options["choices"].append(["Auto Setting", ["Manual", "Auto", "Full Auto", "Full Auto Guard"], [None, "auto.png", "fa.png", "fa_guard.png"], "template-"+str(i), self.autoSetAsset])
                     e["type"] = "asset"
                 case "nminput":
-                    options["choices"].append(["GW ID", None, None, e, self.autoSetGW])
-                    options["choices"].append(["NM Setting", ["None", "NM90", "NM95", "NM100", "NM150", "NM200"], [None, 90, 95, 100, 150, 200], e, self.autoSetNM])
+                    options["choices"].append(["GW ID", None, None, "template-"+str(i), self.autoSetGW])
+                    options["choices"].append(["NM Setting", ["None", "NM90", "NM95", "NM100", "NM150", "NM200"], [None, 90, 95, 100, 150, 200], "template-"+str(i), self.autoSetNM])
                     e["type"] = "asset"
                 case "textinput":
-                    options["settings"][e["ref"]] = ""
-                    options["choices"].append([e["ref"], None, None, options["settings"][e["ref"]], self.autoSetValue])
+                    options["choices"].append([e["ref"], None, None, "choices-"+str(len(options["choices"])), self.autoSetText])
         return options
 
-    def autoSetValue(self, target, value):
-        target = value
+    def getOptionTarget(self, options, target):
+        match target:
+            case "settings": return options["settings"]
+            case _:
+                if target.startswith('choices'):
+                    el = target.split('-')
+                    el[1] = int(el[1])
+                    return options["choices"][el[1]]
+                elif target.startswith('template'):
+                    el = target.split('-')
+                    el[1] = int(el[1])
+                    return options["template"][el[1]]
 
-    def autoSetBG(self, target, value):
+    def autoSetText(self, options, target, value):
+        t = self.getOptionTarget(options, target)
+        options["settings"][t[0]] = value
+
+    def autoSetBG(self, options, target, value):
         if value is None: return
-        target["bg"] = value
+        t = self.getOptionTarget(options, target)
+        t["bg"] = self.boss[value]
 
-    def autoSetAsset(self, target, value):
-        target["asset"] = value
+    def autoSetAsset(self, options, target, value):
+        t = self.getOptionTarget(options, target)
+        t["asset"] = value
 
-    def autoSetGW(self, target, value):
-        target["gwn"] = value.zfill(3)
+    def autoSetGW(self, options, target, value):
+        t = self.getOptionTarget(options, target)
+        t["gwn"] = value.zfill(3)
 
-    def autoSetNM(self, target, value):
+    def autoSetNM(self, options, target, value):
+        t = self.getOptionTarget(options, target)
         if value is None:
-            target["asset"] = value
+            t["asset"] = value
         else:
-            target["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(target["gwn"], target["gwn"], value)
+            t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(t["gwn"], t["gwn"], value)
 
-    def makeThumbnailManual(self):
+    # end of GBFPIB compatibility
+
+    def makeThumbnailManual(self, gbfpib=None):
         print("Please select a template:")
         choices = []
         for k in self.template:
@@ -400,7 +420,10 @@ class GBFTMR():
             match e["type"]:
                 case "party":
                     try:
-                        settings["gbfpib"] = json.loads(pyperclip.paste())
+                        if gbfpib is not None:
+                            settings["gbfpib"] = gbfpib
+                        else:
+                            settings["gbfpib"] = json.loads(pyperclip.paste())
                     except:
                         print("Failed to load the party data, make sure you export it with the GBFPIB bookmark first")
                         return
@@ -446,11 +469,15 @@ class GBFTMR():
         self.makeThumbnail(settings, template)
 
     def makeThumbnail(self, settings, template):
+        print("[TMR] |--> Generating thumbnail...")
         if 'bg' in settings:
+            print("[TMR] |--> Generating background for boss", settings['bg'][0])
             img = self.generate(settings['bg'][0], settings['bg'][1], settings['bg'][2])
         else:
+            print("[TMR] |--> No backgrounds selected")
             img = self.make_canvas((1280, 720))
-        for e in template:
+        for i, e in enumerate(template):
+            print("[TMR] |--> Processing Element #{}: {}".format(i, e["type"]))
             match e["type"]:
                 case "party":
                     img = self.auto_party(img, settings, e)
@@ -458,8 +485,10 @@ class GBFTMR():
                     img = self.auto_asset(img, settings, e)
                 case "textinput":
                     img = self.auto_text(img, settings, e)
+        print("[TMR] |--> Saving...")
         img.save("thumbnail.png", "PNG")
         img.close()
+        print("[TMR] |--> thumbnail.png has been generated with success")
 
     def auto_asset(self, img, settings, element): # auto asset parsing
         if element["asset"] is None: return img
