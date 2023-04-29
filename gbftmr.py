@@ -1,0 +1,734 @@
+import json
+import re
+import httpx
+import sys
+from PIL import Image, ImageFont, ImageDraw
+from io import BytesIO
+import pyperclip
+import os
+import base64
+import copy
+
+class GBFTMR():
+    def __init__(self, path=""):
+        self.version = [1, 0]
+        print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
+        self.path = path
+        self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
+        self.cache = {}
+        self.classes = { # class prefix (gotta add them manually, sadly)
+            10: 'sw',
+            11: 'sw',
+            12: 'wa',
+            13: 'wa',
+            14: 'kn',
+            15: 'sw',
+            16: 'me',
+            17: 'bw',
+            18: 'mc',
+            19: 'sp',
+            30: 'sw',
+            41: 'ax',
+            42: 'sp',
+            43: 'me',
+            44: 'bw',
+            45: 'sw',
+            20: 'kn',
+            21: 'kt',
+            22: 'kt',
+            23: 'sw',
+            24: 'gu',
+            25: 'wa',
+            26: 'kn',
+            27: 'mc',
+            28: 'kn',
+            29: 'gu'
+        }
+        self.nullchar = [3030182000, 3020072000]
+        self.regex = [
+            re.compile('(30[0-9]{8})_01\\.'),
+            re.compile('(20[0-9]{8})_03\\.'),
+            re.compile('(20[0-9]{8})_02\\.'),
+            re.compile('(20[0-9]{8})\\.'),
+            re.compile('(10[0-9]{8})\\.')
+        ]
+        self.asset_urls = [
+            [
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}.jpg",
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/quest/{}.jpg",
+                "ttp://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/my/{}.png",
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/job_change/{}.png",
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/job_change/{}.png"
+            ],
+            [
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/s/{}.jpg",
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/m/{}.jpg",
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/b/{}.png",
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/b/{}.png",
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/b/{}.png"
+            ],
+            [
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/s/{}.jpg",
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/m/{}.jpg",
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/my/{}.png",
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/b/{}.png",
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/b/{}.png"
+            ],
+            [
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/s/{}.jpg",
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/quest/{}.jpg",
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/my/{}.png",
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img_low/sp/assets/npc/b/{}.png",
+                "https://media.skycompass.io/assets/customizes/characters/1138x1138/{}.png"
+            ],
+            [
+                "assets/{}",
+                "assets/{}",
+                "assets/{}",
+                "assets/{}",
+                "assets/{}"
+            ],
+            [
+                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/s/{}.jpg",
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/deckcombination/base_empty_weapon_sub.png",
+                "",
+                "",
+                ""
+            ],
+            [
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/s/{}.jpg",
+                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/deckcombination/base_empty_npc.jpg",
+                "",
+                "",
+                ""
+            ]
+        ]
+        self.possible_pos = ["topleft", "left", "bottomleft", "bottom", "bottomright", "right", "topright", "top", "middle"]
+        self.possible_display = ["squareicon", "partyicon", "fullart", "homeart", "skycompass"]
+        self.boss = {}
+        self.loadBosses()
+        self.template = {}
+        self.loadTemplates()
+        tmp = Image.open(self.path+"assets/mask.png")
+        self.mask = tmp.convert('L')
+        tmp.close()
+
+    def loadTemplates(self):
+        try:
+            with open(self.path+"template.json", mode="r", encoding="utf-8") as f:
+                self.template = json.load(f)
+        except Exception as e:
+            print(e)
+
+    def loadBosses(self):
+        try:
+            with open(self.path+"boss.json", mode="r", encoding="utf-8") as f:
+                self.boss = json.load(f)
+        except:
+            pass
+
+    def saveBosses(self):
+        try:
+            with open(self.path+"boss.json", mode="w", encoding="utf-8") as f:
+                json.dump(self.boss, f, ensure_ascii=False)
+        except:
+            pass
+
+    def checkDiskCache(self): # check if cache folder exists (and create it if needed)
+        if not os.path.isdir(self.path + 'cache'):
+            os.mkdir(self.path + 'cache')
+
+    def getAsset(self, url):
+        response = self.client.get(url, headers={'connection':'keep-alive'})
+        if response.status_code != 200: raise Exception()
+        return response.content
+
+    def addBoss(self):
+        print("Input an Enemy ID with a valid Appear animation (Leave blank to cancel)")
+        s = input()
+        if s == "": return
+        eid = s
+        bg = None
+        eico = None
+        print("Do you want to add a background? ('y' to confirm)")
+        if input().lower() == 'y':
+            print("Input a background name (Leave blank to skip)")
+            s = input()
+            if s != "": bg = s
+        print("Select a different icon? ('y' to confirm)")
+        if input().lower() == 'y':
+            print("Input an Enemy ID (Leave blank to skip)")
+            s = input()
+            if s != "": eico = s
+        if eico is None: eico = eid
+        print("Generating a preview...")
+        img = self.generate(eid, bg, eico)
+        if img is None:
+            print("An error occured, check if the ID you provided are correct")
+            return
+        else:
+            img.show()
+            img.close()
+        while True:
+            print("Input a name to save those settings (Leave blank to cancel)")
+            s = input().lower()
+            if s == "": return
+            if s in self.boss:
+                print(s, "already exists, overwrite? ('y' to confirm)")
+                if input().lower() != 'y':
+                    continue
+            self.boss[s] = [eid, bg, eico]
+            self.saveBosses()
+            break
+
+    def get_mc_job_look(self, skin, job): # get the MC unskined filename based on id
+        jid = job // 10000
+        if jid not in self.classes: return skin
+        return "{}_{}_{}".format(job, self.classes[jid], '_'.join(skin.split('_')[2:]))
+
+    def check_id(self, id, recur=True): # check an element id and return it if valid (None if error)
+        if id is None or not isinstance(id, str): return None
+        try:
+            if len(id.replace('skin/', '').split('_')[0]) != 10: raise Exception("MC?")
+            int(id.replace('skin/', '').split('_')[0])
+            t = int(id.replace('skin/', '')[0])
+        except Exception as e:
+            if str(e) == "MC?":
+                t = 0
+                if len(id.split("_")) != 4:
+                    try:
+                        id = self.get_mc_job_look(None, id)
+                    except:
+                        if recur: return self.check_id(self.search_id_on_wiki(id), recur=False) # wiki check
+                        else: return None
+            else:
+                if recur: return self.check_id(self.search_id_on_wiki(id), recur=False) # wiki check
+                else: return None
+        if id is None:
+            return None
+        if t > 1 and '_' not in id:
+            id += '_' + input("Input uncap/modifier string:")
+        return id
+
+    def get_uncap_id(self, cs): # to get character portraits based on uncap levels
+        return {2:'02', 3:'02', 4:'02', 5:'03', 6:'04'}.get(cs, '01')
+
+    def valid_name(self, s):
+        for c in s:
+            if c not in "abcdefghijklmnopqrstuvwxyz0123456789_":
+                return False
+        return True
+
+    def generate(self, eid, bg, eico):
+        try:
+            cjs = self.getAsset("https://prd-game-a3-granbluefantasy.akamaized.net/assets_en/js_low/cjs/raid_appear_{}.js".format(eid)).decode('utf-8')
+            token = "raid_appear_"+eid+"_"
+            pos = 0
+            elements = {}
+            while True:
+                a = cjs.find(token, pos)
+                if a == -1: break
+                b = cjs.find("=", a)
+                if b == -1: break
+                name = cjs[a+len(token):b]
+                if not self.valid_name(name) or name in elements:
+                    pos = a + len(token)
+                    continue
+                c = cjs.find(".Rectangle(", b)
+                if c == -1: break
+                d = cjs.find(")", c)
+                if d == -1: break
+                rect = cjs[c+len(".Rectangle("):d]
+                pos = d
+                elements[name] = []
+                rect = rect.split(',')
+                for r in rect:
+                    if r.startswith('.'): r = '0'+r
+                    elements[name].append(float(r))
+                elements[name][2] += elements[name][0]
+                elements[name][3] += elements[name][1]
+            if bg is not None:
+                with BytesIO(self.getAsset("https://game.granbluefantasy.jp/assets_en/img/sp/raid/bg/{}.jpg".format(bg))) as img_data:
+                    img = Image.open(img_data)
+                    mod = 1280/img.size[0]
+                    tmp = img.resize((int(img.size[0]*mod), int(img.size[0]*mod)), Image.Resampling.LANCZOS)
+                    img.close()
+                    img = tmp
+                    tmp = img.crop((0, 0, 1280, 720))
+                    img.close()
+                    img = tmp
+                    tmp = Image.new("L", img.size, "white")
+                    img.putalpha(tmp)
+                    tmp.close()
+                    background = img
+            else:
+                background = None
+            with BytesIO(self.getAsset("https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/cjs/raid_appear_{}.png".format(eid))) as img_data:
+                appear = Image.open(img_data)
+                tmp = appear.convert('RGBA')
+                appear.close()
+                appear = tmp
+                img = self.make_canvas((1280, 720))
+                for k in ['boss', 'bg', 'vs', 'name_a']:
+                    crop = appear.crop(tuple(elements[k]))
+                    match k:
+                        case 'boss':
+                            mod = 720/crop.size[1]
+                            if mod > 1:
+                                tmp = crop.resize((int(crop.size[0]*mod), int(crop.size[0]*mod)), Image.Resampling.LANCZOS)
+                                crop.close()
+                                crop = tmp
+                            offset = (0, 0)
+                        case 'bg':
+                            offset = ((640 - crop.size[0]) // 2, 360)
+                        case 'vs':
+                            offset = ((640 - crop.size[0]) // 2, 350)
+                        case 'name_a':
+                            offset = ((640 - crop.size[0]) // 2, 450)
+                    layer = self.make_canvas((1280, 720))
+                    layer.paste(crop, offset, crop)
+                    mod = Image.alpha_composite(img, layer)
+                    img.close()
+                    layer.close()
+                    crop.close()
+                    img = mod
+                    if k == 'bg': # gradient
+                        grad = self.make_canvas((1280, 720))
+                        tmp = Image.composite(img, grad, self.mask)
+                        img.close()
+                        grad.close()
+                        img = tmp
+                if background is not None:
+                    tmp = Image.alpha_composite(background, img)
+                    background.close()
+                    img.close()
+                    img = tmp
+            try:
+                with BytesIO(self.getAsset("https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/enemy/m/{}.png".format(eico))) as img_data:
+                    mod = Image.open(img_data)
+                    tmp = mod.convert("RGBA")
+                    mod.close()
+                    layer = self.make_canvas((1280, 720))
+                    layer.paste(tmp, (10, 720-tmp.size[1]-10), tmp)
+                    tmp.close()
+                    tmp = Image.alpha_composite(img, layer)
+                    img.close()
+                    layer.close()
+                    img = tmp
+            except Exception as e:
+                print(e)
+            return img
+        except:
+            return None
+
+    def make_canvas(self, size): # make a blank image to the specified size
+        i = Image.new('RGB', size, "black")
+        im_a = Image.new("L", i.size, "black")
+        i.putalpha(im_a)
+        im_a.close()
+        return i
+
+    def addTuple(self, A:tuple, B:tuple): # to add pairs together
+        return (A[0]+B[0], A[1]+B[1])
+
+    def mulTuple(self, A:tuple, f:float): # multiply a pair by a value
+        return (int(A[0]*f), int(A[1]*f))
+
+    def getTemplateList(self):
+        return list(self.template.keys())
+
+    def getThumbnailOptions(self, k):
+        if k not in self.template: return None
+        options = {"template":copy.deepcopy(self.template[k]), "settings":{}, "choices":[]}
+        options["choices"].append(["Background", ["None"]+list(self.boss.keys()), [None]+list(self.boss.keys()), options["settings"], self.autoSetBG])
+        for e in options["template"]:
+            match e["type"]:
+                case "autoinput":
+                    options["choices"].append(["Auto Setting", ["Manual", "Auto", "Full Auto", "Full Auto Guard"], [None, "auto.png", "fa.png", "fa_guard.png"], e, self.autoSetAsset])
+                    e["type"] = "asset"
+                case "nminput":
+                    options["choices"].append(["GW ID", None, None, e, self.autoSetGW])
+                    options["choices"].append(["NM Setting", ["None", "NM90", "NM95", "NM100", "NM150", "NM200"], [None, 90, 95, 100, 150, 200], e, self.autoSetNM])
+                    e["type"] = "asset"
+                case "textinput":
+                    options["settings"][e["ref"]] = ""
+                    options["choices"].append([e["ref"], None, None, options["settings"][e["ref"]], self.autoSetValue])
+        return options
+
+    def autoSetValue(self, target, value):
+        target = value
+
+    def autoSetBG(self, target, value):
+        if value is None: return
+        target["bg"] = value
+
+    def autoSetAsset(self, target, value):
+        target["asset"] = value
+
+    def autoSetGW(self, target, value):
+        target["gwn"] = value.zfill(3)
+
+    def autoSetNM(self, target, value):
+        if value is None:
+            target["asset"] = value
+        else:
+            target["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(target["gwn"], target["gwn"], value)
+
+    def makeThumbnailManual(self):
+        print("Please select a template:")
+        choices = []
+        for k in self.template:
+            print("[{}] {}".format(len(choices), k))
+            choices.append(k)
+        print("[Any] Cancel")
+        s = input()
+        try: k = choices[int(s)]
+        except: return
+        settings = {}
+        while True:
+            print("Input the background you want to use (Leave blank to ignore)")
+            s = input().lower()
+            if s == "":
+                break
+            if s not in self.boss:
+                print(s, "not found in the boss data")
+                continue
+            settings['bg'] = self.boss[s]
+            break
+        template = copy.deepcopy(self.template[k])
+        for e in template:
+            match e["type"]:
+                case "party":
+                    try:
+                        settings["gbfpib"] = json.loads(pyperclip.paste())
+                    except:
+                        print("Failed to load the party data, make sure you export it with the GBFPIB bookmark first")
+                        return
+                case "autoinput":
+                    print("Select an Auto setting:")
+                    print("[0] Auto")
+                    print("[1] Full Auto")
+                    print("[2] Full Auto Guard")
+                    print("[Any] Manual")
+                    match input():
+                        case "0":
+                            e["asset"] = "auto.png"
+                        case "1":
+                            e["asset"] = "fa.png"
+                        case "2":
+                            e["asset"] = "fa_guard.png"
+                        case _:
+                            e["asset"] = None
+                    e["type"] = "asset"
+                case "nminput":
+                    print("Select a NM:")
+                    print("[0] NM90")
+                    print("[1] NM95")
+                    print("[2] NM100")
+                    print("[3] NM150")
+                    print("[4] NM200")
+                    print("[Any] Skip")
+                    match input():
+                        case "0": nm = 90
+                        case "1": nm = 95
+                        case "2": nm = 100
+                        case "3": nm = 150
+                        case "4": nm = 200
+                        case _: nm = None
+                    if nm is not None:
+                        print("Input GW Number:")
+                        gwn = input().zfill(3)
+                        e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(gwn, gwn, nm)
+                        e["type"] = "asset"
+                case "textinput":
+                    print("Input the '{}'".format(e["ref"]))
+                    settings[e["ref"]] = input()
+        self.makeThumbnail(settings, template)
+
+    def makeThumbnail(self, settings, template):
+        if 'bg' in settings:
+            img = self.generate(settings['bg'][0], settings['bg'][1], settings['bg'][2])
+        else:
+            img = self.make_canvas((1280, 720))
+        for e in template:
+            match e["type"]:
+                case "party":
+                    img = self.auto_party(img, settings, e)
+                case "asset":
+                    img = self.auto_asset(img, settings, e)
+                case "textinput":
+                    img = self.auto_text(img, settings, e)
+        img.save("thumbnail.png", "PNG")
+        img.close()
+
+    def auto_asset(self, img, settings, element): # auto asset parsing
+        if element["asset"] is None: return img
+        pos = element.get('anchor', 'topleft')
+        offset = element.get('position', (0,0))
+        ratio = element.get('size', 1.0)
+        img = self.make_img_from_element(img, [element["asset"]], pos, offset, ratio)
+        return img
+
+    def auto_text(self, img, settings, element): # auto text parsing
+        text = settings.get(element['ref'], '')
+        fc = tuple(element.get('fontcolor', (255, 255, 255)))
+        oc = tuple(element.get('outlinecolor', (255, 0, 0)))
+        os = element.get('outlinesize', 10)
+        bold = element.get('bold', False)
+        italic = element.get('italic', False)
+        pos = element.get('anchor', 'middle')
+        offset = element.get('position', (0, 0))
+        fs = element.get('fontsize', 120)
+        img = self.make_img_from_text(img, text, fc, oc, os, bold, italic, pos, offset, fs)
+        return img
+
+    def auto_party(self, img, settings, element): # auto party drawing
+        characters = []
+        noskin = element.get("noskin", False)
+        mainsummon = element.get("mainsummon", False)
+        try:
+            export = settings['gbfpib']
+            babyl = (len(export['c']) > 5)
+            if not mainsummon:
+                if noskin:
+                    characters.append(self.get_mc_job_look(export['pcjs'], export['p']))
+                else:
+                    characters.append(export['pcjs'])
+            if babyl: nchara = 12
+            else: nchara = 5
+            for x in range(0, nchara):
+                if mainsummon:break
+                if babyl and x == 0:
+                    continue
+                if x >= len(export['c']) or export['c'][x] is None:
+                    characters.append("3999999999")
+                    continue
+                if noskin:
+                    if export['c'][x] in self.nullchar: 
+                        cid = "{}_{}_0{}".format(export['c'][x], self.get_uncap_id(export['cs'][x]), export['ce'][x])
+                    else:
+                        cid = "{}_{}".format(export['c'][x], self.get_uncap_id(export['cs'][x]))
+                    characters.append(cid)
+                else:
+                    characters.append(export['ci'][x])
+            if export['s'][0] is not None:
+                characters.append(export['ss'][0])
+            if not mainsummon:
+                if export['w'][0] is not None and export['wl'][0] is not None:
+                    characters.append(str(export['w'][0]) + "00")
+                else:
+                    characters.append("1999999999")
+        except Exception as e:
+            print("An error occured while importing a party:", e)
+            raise Exception("Failed to import party data")
+
+        pos = element.get('anchor', 'topleft')
+        offset = element.get('position', (0,0))
+        ratio = element.get('size', 1.0)
+        if mainsummon:
+            img = self.make_img_from_element(img, characters, pos, offset, ratio, "partyicon")
+        elif babyl:
+            img = self.make_img_from_element(img, characters[:4], pos, offset, ratio, "squareicon", (100, 100))
+            img = self.make_img_from_element(img, characters[4:8], pos, self.addTuple(offset, self.mulTuple((0, 100), ratio)), ratio, "squareicon", (100, 100))
+            img = self.make_img_from_element(img, characters[8:12], pos, self.addTuple(offset, self.mulTuple((0, 200), ratio)), ratio, "squareicon", (100, 100))
+            img = self.make_img_from_element(img, characters[12:13], pos, self.addTuple(offset, self.mulTuple((0, 310), ratio)), ratio, "partyicon", (192, 108))
+            img = self.make_img_from_element(img, characters[13:14], pos, self.addTuple(offset, self.mulTuple((208, 310), ratio)), ratio, "partyicon", (192, 108))
+        else:
+            img = self.make_img_from_element(img, characters[:4], pos, offset, ratio, "partyicon", (78, 142))
+            img = self.make_img_from_element(img, characters[4:6], pos, self.addTuple(offset, self.mulTuple((78*4+15, 0), ratio)), ratio, "partyicon", (78, 142))
+            img = self.make_img_from_element(img, characters[6:7], pos, self.addTuple(offset, self.mulTuple((25, 142+10), ratio)), 0.75*ratio, "partyicon", (280, 160))
+            img = self.make_img_from_element(img, characters[7:8], pos, self.addTuple(offset, self.mulTuple((25+280*0.75+15, 142+10), ratio)), 0.75*ratio, "partyicon", (280, 160))
+        return img
+
+    def make_img_from_element(self, img, characters = [], pos = "middle", offset = (0, 0), ratio = 1.0, display = "squareicon", fixedsize=None): # draw elements onto an image
+        modified = img.copy()
+        match pos.lower():
+            case "topleft":
+                cur_pos = (0, 0)
+            case "top":
+                cur_pos = (640, 0)
+            case "topright":
+                cur_pos = (1280, 0)
+            case "right":
+                cur_pos = (1280, 360)
+            case "bottomright":
+                cur_pos = (1280, 720)
+            case "bottom":
+                cur_pos = (640, 720)
+            case "bottomleft":
+                cur_pos = (0, 720)
+            case "left":
+                cur_pos = (0, 360)
+            case "middle":
+                cur_pos = (640, 360)
+        cur_pos = self.addTuple(cur_pos, offset)
+        for c in characters:
+            size, u = self.get_element_size(c, display)
+            if size is None: continue
+            if fixedsize is not None:
+                size = fixedsize
+            size = self.mulTuple(size, ratio)
+            match pos.lower():
+                case "topright":
+                    cur_pos = self.addTuple(cur_pos, (-size[0], 0))
+                case "right":
+                    cur_pos = self.addTuple(cur_pos, (-size[0], 0))
+                case "bottomright":
+                    cur_pos = self.addTuple(cur_pos, (-size[0], -size[1]))
+                case "bottom":
+                    cur_pos = self.addTuple(cur_pos, (0, -size[1]))
+                case "bottomleft":
+                    cur_pos = self.addTuple(cur_pos, (0, -size[1]))
+            if u.startswith("http"):
+                modified = self.dlAndPasteImage(modified, u, cur_pos, resize=size)
+            else:
+                modified = self.pasteImage(modified, u, cur_pos, resize=size)
+            cur_pos = self.addTuple(cur_pos, (size[0], 0))
+        img.close()
+        return modified
+
+    def make_img_from_text(self, img, text = "", fc = (255, 255, 255), oc = (0, 0, 0), os = 10, bold = False, italic = False, pos = "middle", offset = (0, 0), fs = 24): # to draw text into an image
+        text = text.replace('\\n', '\n')
+        modified = img.copy()
+        d = ImageDraw.Draw(modified, 'RGBA')
+        font_file = "font"
+        if bold: font_file += "b"
+        if italic: font_file += "i"
+        font = ImageFont.truetype(self.path + "assets/" + font_file + ".ttf", fs, encoding="unic")
+        nl = text.split('\n')
+        size = [0, 0]
+        for l in nl:
+            s = font.getbbox(l, stroke_width=os)
+            size[0] = max(size[0], s[2]-s[0])
+            size[1] += s[3]-s[1] + 10
+        size[1] = int(size[1] * 1.15)
+        match pos.lower():
+            case "topleft":
+                text_pos = (0, 0)
+            case "top":
+                text_pos = (640-size[0]//2, 0)
+            case "topright":
+                text_pos = (1280-size[0], 0)
+            case "right":
+                text_pos = (1280-size[0], 360-size[1]//2)
+            case "bottomright":
+                text_pos = (1280-size[0], 720-size[1])
+            case "bottom":
+                text_pos = (640-size[0]//2, 720-size[1])
+            case "bottomleft":
+                text_pos = (0, 720-size[1])
+            case "left":
+                text_pos = (0, 360-size[1]//2)
+            case "middle":
+                text_pos = (640-size[0]//2, 360-size[1]//2)
+        text_pos = self.addTuple(text_pos, offset)
+        d.text(text_pos, text, fill=fc, font=font, stroke_width=os, stroke_fill=oc)
+        img.close()
+        return modified
+
+    def get_element_size(self, c, display): # retrive an element asset and return its size
+        try:
+            if not c.startswith("http"):
+                if c == "1999999999":
+                    t = 5
+                elif c == "3999999999":
+                    t = 6
+                else:
+                    try:
+                        if len(c.replace('skin/', '').split('_')[0]) < 10: raise Exception("MC?")
+                        int(c.replace('skin/', '').split('_')[0])
+                        t = int(c.replace('skin/', '')[0])
+                    except Exception as e:
+                        if str(e) == "MC?":
+                            t = 0
+                            if len(c.split("_")) != 4:
+                                try:
+                                    c = self.get_mc_job_look(None, c)
+                                except:
+                                    t = 4
+                        else:
+                            t = 4
+                try: u = self.asset_urls[t][self.possible_display.index(display.lower())].format(c)
+                except: u = self.asset_urls[t][self.possible_display.index(display.lower())]
+                if t == 4: u = self.path + u
+            else:
+                u = c
+            if u.startswith("http"):
+                with BytesIO(self.dlImage(u)) as file_jpgdata:
+                    buf = Image.open(file_jpgdata)
+                    size = buf.size
+                    buf.close()
+            else:
+                buf = Image.open(u)
+                size = buf.size
+                buf.close()
+            return size, u
+        except:
+            return None, None
+
+    def dlImage(self, url): # download an image (check the cache first)
+        if url not in self.cache:
+            self.checkDiskCache()
+            try: # get from disk cache if enabled
+                with open(self.path + "cache/" + base64.b64encode(url.encode('utf-8')).decode('utf-8'), "rb") as f:
+                    self.cache[url] = f.read()
+            except: # else request it from gbf
+                self.cache[url] = self.getAsset(url)
+                try:
+                    with open(self.path + "cache/" + base64.b64encode(url.encode('utf-8')).decode('utf-8'), "wb") as f:
+                        f.write(self.cache[url])
+                except Exception as e:
+                    print(url, ":", e)
+                    pass
+        return self.cache[url]
+
+    def dlAndPasteImage(self, img, url, offset, resize=None, resizeType="default"): # call dlImage() and pasteImage()
+        with BytesIO(self.dlImage(url)) as file_jpgdata:
+            return self.pasteImage(img, file_jpgdata, offset, resize, resizeType)
+
+    def pasteImage(self, img, file, offset, resize=None, resizeType="default"): # paste an image onto another
+        buffers = [Image.open(file)]
+        buffers.append(buffers[-1].convert('RGBA'))
+        if resize is not None:
+            match resizeType.lower():
+                case "default":
+                    buffers.append(buffers[-1].resize(resize, Image.Resampling.LANCZOS))
+                case "fit":
+                    size = buffers[-1].size
+                    mod = min(resize[0]/size[0], resize[1]/size[1])
+                    offset = self.addTuple(offset, (int(resize[0]-size[0]*mod)//2, int(resize[1]-size[1]*mod)//2))
+                    buffers.append(buffers[-1].resize((int(size[0]*mod), int(size[1]*mod)), Image.Resampling.LANCZOS))
+                case "fill":
+                    size = buffers[-1].size
+                    mod = max(resize[0]/size[0], resize[1]/size[1])
+                    offset = self.addTuple(offset, (int(resize[0]-size[0]*mod)//2, int(resize[1]-size[1]*mod)//2))
+                    buffers.append(buffers[-1].resize((int(size[0]*mod), int(size[1]*mod)), Image.Resampling.LANCZOS))
+        size = buffers[-1].size
+        if size[0] == img.size[0] and size[1] == img.size[1] and offset[0] == 0 and offset[1] == 0:
+            modified = Image.alpha_composite(img, buffers[-1])
+        else:
+            layer = self.make_canvas((1280, 720))
+            layer.paste(buffers[-1], offset, buffers[-1])
+            modified = Image.alpha_composite(img, layer)
+            layer.close()
+        for buf in buffers: buf.close()
+        del buffers
+        return modified
+
+    def cmd(self):
+        while True:
+            print("Main Menu")
+            print("[0] Add Boss Fight")
+            print("[1] Generate Thumbnail")
+            print("[Any] Quit")
+            s = input()
+            match s:
+                case '0':
+                    self.addBoss()
+                case '1':
+                    self.makeThumbnailManual()
+                case _:
+                    break
+
+if __name__ == "__main__":
+    GBFTMR().cmd()
