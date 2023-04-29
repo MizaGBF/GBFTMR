@@ -1,7 +1,6 @@
 import json
 import re
 import httpx
-import sys
 from PIL import Image, ImageFont, ImageDraw
 from io import BytesIO
 import pyperclip
@@ -11,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 0]
+        self.version = [1, 1]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -150,19 +149,17 @@ class GBFTMR():
         eid = s
         bg = None
         eico = None
-        print("Do you want to add a background? ('y' to confirm)")
-        if input().lower() == 'y':
-            print("Input a background name (Leave blank to skip)")
-            s = input()
-            if s != "": bg = s
-        print("Select a different icon? ('y' to confirm)")
-        if input().lower() == 'y':
-            print("Input an Enemy ID (Leave blank to skip)")
-            s = input()
-            if s != "": eico = s
-        if eico is None: eico = eid
+        print("Input a background file name (Leave blank to skip)")
+        s = input()
+        if s != "": bg = s
+        print("Input another Enemy ID to set a different icon (Leave blank to skip or input None to disable)")
+        s = input()
+        if s != "":
+            if s != "None": eico = s
+        else:
+            eico = eid
         print("Generating a preview...")
-        img = self.generate(eid, bg, eico)
+        img = self.generateBackground(eid, bg, eico)
         if img is None:
             print("An error occured, check if the ID you provided are correct")
             return
@@ -219,7 +216,7 @@ class GBFTMR():
                 return False
         return True
 
-    def generate(self, eid, bg, eico):
+    def generateBackground(self, eid, bg, eico):
         try:
             cjs = self.getAsset("https://prd-game-a3-granbluefantasy.akamaized.net/assets_en/js_low/cjs/raid_appear_{}.js".format(eid)).decode('utf-8')
             token = "raid_appear_"+eid+"_"
@@ -254,7 +251,8 @@ class GBFTMR():
                     tmp = img.resize((int(img.size[0]*mod), int(img.size[0]*mod)), Image.Resampling.LANCZOS)
                     img.close()
                     img = tmp
-                    tmp = img.crop((0, 0, 1280, 720))
+                    y = img.size[1]//2-360
+                    tmp = img.crop((0, y, 1280, y+720))
                     img.close()
                     img = tmp
                     tmp = Image.new("L", img.size, "white")
@@ -263,13 +261,28 @@ class GBFTMR():
                     background = img
             else:
                 background = None
+            
+            # debug
+            """for k in elements:
+                print(k, elements[k])"""
+            
+            # mostly fixes for diaspora, sieg etc...
+            parts = ['boss', 'bg', 'vs', 'name_a']
+            if 'vs_bg' in elements:
+                parts[1] = 'vs_bg'
+                parts.insert(0, 'bg')
+            if 'boss_a' in elements: parts[-1] = 'boss_a'
+            if 'name_vs' in elements: parts.append('name_vs')
+            if 'jp' in elements: parts.append('jp')
+            if 'en' in elements: parts.append('en')
+            
             with BytesIO(self.getAsset("https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/cjs/raid_appear_{}.png".format(eid))) as img_data:
                 appear = Image.open(img_data)
                 tmp = appear.convert('RGBA')
                 appear.close()
                 appear = tmp
                 img = self.make_canvas((1280, 720))
-                for k in ['boss', 'bg', 'vs', 'name_a']:
+                for k in parts:
                     crop = appear.crop(tuple(elements[k]))
                     match k:
                         case 'boss':
@@ -280,10 +293,21 @@ class GBFTMR():
                                 crop = tmp
                             offset = (0, 0)
                         case 'bg':
-                            offset = ((640 - crop.size[0]) // 2, 360)
+                            if k == parts[0]: offset = (0, 0)
+                            else: offset = ((640 - crop.size[0]) // 2, 360)
                         case 'vs':
                             offset = ((640 - crop.size[0]) // 2, 350)
+                        case 'vs_bg':
+                            offset = ((640 - crop.size[0]) // 2, 300)
+                        case 'jp':
+                            offset = ((640 - crop.size[0]) // 2, 480)
+                        case 'en':
+                            offset = ((640 - crop.size[0]) // 2, 540)
                         case 'name_a':
+                            offset = ((640 - crop.size[0]) // 2, 450)
+                        case 'boss_a':
+                            offset = ((640 - crop.size[0]) // 2, 440)
+                        case 'name_vs':
                             offset = ((640 - crop.size[0]) // 2, 450)
                     layer = self.make_canvas((1280, 720))
                     layer.paste(crop, offset, crop)
@@ -304,17 +328,18 @@ class GBFTMR():
                     img.close()
                     img = tmp
             try:
-                with BytesIO(self.getAsset("https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/enemy/m/{}.png".format(eico))) as img_data:
-                    mod = Image.open(img_data)
-                    tmp = mod.convert("RGBA")
-                    mod.close()
-                    layer = self.make_canvas((1280, 720))
-                    layer.paste(tmp, (10, 720-tmp.size[1]-10), tmp)
-                    tmp.close()
-                    tmp = Image.alpha_composite(img, layer)
-                    img.close()
-                    layer.close()
-                    img = tmp
+                if eico is not None:
+                    with BytesIO(self.getAsset("https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/enemy/m/{}.png".format(eico))) as img_data:
+                        mod = Image.open(img_data)
+                        tmp = mod.convert("RGBA")
+                        mod.close()
+                        layer = self.make_canvas((1280, 720))
+                        layer.paste(tmp, (15, 720-tmp.size[1]-15), tmp)
+                        tmp.close()
+                        tmp = Image.alpha_composite(img, layer)
+                        img.close()
+                        layer.close()
+                        img = tmp
             except Exception as e:
                 print(e)
             return img
@@ -472,7 +497,7 @@ class GBFTMR():
         print("[TMR] |--> Generating thumbnail...")
         if 'bg' in settings:
             print("[TMR] |--> Generating background for boss", settings['bg'][0])
-            img = self.generate(settings['bg'][0], settings['bg'][1], settings['bg'][2])
+            img = self.generateBackground(settings['bg'][0], settings['bg'][1], settings['bg'][2])
         else:
             print("[TMR] |--> No backgrounds selected")
             img = self.make_canvas((1280, 720))
