@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 1]
+        self.version = [1, 2]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -130,6 +130,7 @@ class GBFTMR():
         try:
             with open(self.path+"boss.json", mode="w", encoding="utf-8") as f:
                 json.dump(self.boss, f, ensure_ascii=False)
+            print("'boss.json' updated")
         except:
             pass
 
@@ -271,7 +272,12 @@ class GBFTMR():
             if 'vs_bg' in elements:
                 parts[1] = 'vs_bg'
                 parts.insert(0, 'bg')
-            if 'boss_a' in elements: parts[-1] = 'boss_a'
+            name_y_off = 0
+            if 'name_a' in elements:
+                name_y_off = int(max(135, elements['name_a'][3] - elements['name_a'][1])) - 135
+            if 'boss_a' in elements:
+                name_y_off = int(max(135, elements['boss_a'][3] - elements['boss_a'][1])) - 135
+                parts[-1] = 'boss_a'
             if 'name_vs' in elements: parts.append('name_vs')
             if 'jp' in elements: parts.append('jp')
             if 'en' in elements: parts.append('en')
@@ -291,24 +297,24 @@ class GBFTMR():
                                 tmp = crop.resize((int(crop.size[0]*mod), int(crop.size[0]*mod)), Image.Resampling.LANCZOS)
                                 crop.close()
                                 crop = tmp
-                            offset = (0, 0)
+                            offset = (-20, 0)
                         case 'bg':
                             if k == parts[0]: offset = (0, 0)
-                            else: offset = ((640 - crop.size[0]) // 2, 360)
+                            else: offset = ((640 - crop.size[0]) // 2, 360-name_y_off)
                         case 'vs':
-                            offset = ((640 - crop.size[0]) // 2, 350)
+                            offset = ((640 - crop.size[0]) // 2, 350-name_y_off)
                         case 'vs_bg':
-                            offset = ((640 - crop.size[0]) // 2, 300)
+                            offset = ((640 - crop.size[0]) // 2, 300-name_y_off)
                         case 'jp':
-                            offset = ((640 - crop.size[0]) // 2, 480)
+                            offset = ((640 - crop.size[0]) // 2, 480-name_y_off)
                         case 'en':
-                            offset = ((640 - crop.size[0]) // 2, 540)
+                            offset = ((640 - crop.size[0]) // 2, 540-name_y_off)
                         case 'name_a':
-                            offset = ((640 - crop.size[0]) // 2, 450)
+                            offset = ((640 - crop.size[0]) // 2, 450-name_y_off)
                         case 'boss_a':
-                            offset = ((640 - crop.size[0]) // 2, 440)
+                            offset = ((640 - crop.size[0]) // 2, 440-name_y_off)
                         case 'name_vs':
-                            offset = ((640 - crop.size[0]) // 2, 450)
+                            offset = ((640 - crop.size[0]) // 2, 450-name_y_off)
                     layer = self.make_canvas((1280, 720))
                     layer.paste(crop, offset, crop)
                     mod = Image.alpha_composite(img, layer)
@@ -316,7 +322,7 @@ class GBFTMR():
                     layer.close()
                     crop.close()
                     img = mod
-                    if k == 'bg': # gradient
+                    if (k == 'bg' and k != parts[0]) or (parts[0] == 'bg' and k == 'vs_bg'): # gradient
                         grad = self.make_canvas((1280, 720))
                         tmp = Image.composite(img, grad, self.mask)
                         img.close()
@@ -343,7 +349,8 @@ class GBFTMR():
             except Exception as e:
                 print(e)
             return img
-        except:
+        except Exception as me:
+            print(me)
             return None
 
     def make_canvas(self, size): # make a blank image to the specified size
@@ -769,18 +776,66 @@ class GBFTMR():
         del buffers
         return modified
 
+    def manageBoss(self):
+        while True:
+            print("")
+            print("Boss Management Menu")
+            print("[0] Search Boss by keyword")
+            print("[1] Preview Boss")
+            print("[2] Delete Boss")
+            print("[Any] Back")
+            s = input()
+            match s:
+                case '0':
+                    print("Input keywords to search")
+                    s = input().lower().split(" ")
+                    print("Listing bosses matching the keywords")
+                    for k in self.boss:
+                        for i in s:
+                            if i in k:
+                                print(k)
+                                break
+                    print("Done")
+                case '1':
+                    print("Input the name of a Boss Fight to preview")
+                    s = input().lower()
+                    if s not in self.boss:
+                        print("No result found for", s)
+                    else:
+                        print("Generating preview...")
+                        img = self.generateBackground(*(self.boss[s]))
+                        if img is None:
+                            print("An error occured, aborting...")
+                        else:
+                            print("Opening preview...")
+                            img.show()
+                            img.close()
+                            print("Done")
+                case '2':
+                    print("Input the name of a Boss Fight to delete")
+                    if s in self.boss:
+                        self.boss.pop(s)
+                        self.saveBosses()
+                        print("Done")
+                case _:
+                    break
+
     def cmd(self):
         while True:
+            print("")
             print("Main Menu")
-            print("[0] Add Boss Fight")
-            print("[1] Generate Thumbnail")
+            print("[0] Generate Thumbnail")
+            print("[1] Add Boss Fight")
+            print("[2] Manage Boss Fights")
             print("[Any] Quit")
             s = input()
             match s:
                 case '0':
-                    self.addBoss()
-                case '1':
                     self.makeThumbnailManual()
+                case '1':
+                    self.addBoss()
+                case '2':
+                    self.manageBoss()
                 case _:
                     break
 
