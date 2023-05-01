@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 2]
+        self.version = [1, 3]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -373,9 +373,13 @@ class GBFTMR():
     def getThumbnailOptions(self, k):
         if k not in self.template: return None
         options = {"template":copy.deepcopy(self.template[k]), "settings":{}, "choices":[]}
-        options["choices"].append(["Background", ["None"]+list(self.boss.keys()), [None]+list(self.boss.keys()), "settings", self.autoSetBG])
         for i, e in enumerate(options["template"]):
             match e["type"]:
+                case "background":
+                    options["choices"].append(["Background", ["None"]+list(self.boss.keys()), [None]+list(self.boss.keys()), "settings", self.autoSetBG])
+                case "boss":
+                    options["choices"].append(["Boss ID", None, None, "settings", self.autoSetBoss])
+                    options["choices"].append(["Boss Icon", None, None, "settings", self.autoSetBossIcon])
                 case "autoinput":
                     options["choices"].append(["Auto Setting", ["Manual", "Auto", "Full Auto", "Full Auto Guard"], [None, "auto.png", "fa.png", "fa_guard.png"], "template-"+str(i), self.autoSetAsset])
                     e["type"] = "asset"
@@ -409,6 +413,22 @@ class GBFTMR():
         t = self.getOptionTarget(options, target)
         t["bg"] = self.boss[value]
 
+    def autoSetBoss(self, options, target, value):
+        if value == "": return
+        t = self.getOptionTarget(options, target)
+        if not value.isdigit() and value in self.boss:
+            t["boss"] = [self.boss[value][0], self.boss[value][2]]
+        else:
+            t["boss"] = [value, None]
+
+    def autoSetBossIcon(self, options, target, value):
+        t = self.getOptionTarget(options, target)
+        if "boss" not in t: return
+        if value == "":
+            t["boss"][1] = t["boss"][0]
+        else:
+            t["boss"][1] = value
+
     def autoSetAsset(self, options, target, value):
         t = self.getOptionTarget(options, target)
         t["asset"] = value
@@ -437,28 +457,47 @@ class GBFTMR():
         try: k = choices[int(s)]
         except: return
         settings = {}
-        while True:
-            print("Input the background you want to use (Leave blank to ignore)")
-            s = input().lower()
-            if s == "":
-                break
-            if s not in self.boss:
-                print(s, "not found in the boss data")
-                continue
-            settings['bg'] = self.boss[s]
-            break
         template = copy.deepcopy(self.template[k])
         for e in template:
             match e["type"]:
-                case "party":
-                    try:
-                        if gbfpib is not None:
-                            settings["gbfpib"] = gbfpib
+                case "background":
+                    print("Input the background you want to use (Leave blank to ignore)")
+                    s = input().lower()
+                    if s != "":
+                        if s not in self.boss:
+                            print(s, "not found in the boss data")
+                            return
+                        settings['bg'] = self.boss[s]
+                case "boss":
+                    print("Input the ID of the boss you want to display (Leave blank to ignore)")
+                    s = input().lower()
+                    if s != "":
+                        if not s.isdigit() and s in self.boss:
+                            settings['boss'] = [self.boss[s][0], self.boss[s][2]]
                         else:
-                            settings["gbfpib"] = json.loads(pyperclip.paste())
-                    except:
-                        print("Failed to load the party data, make sure you export it with the GBFPIB bookmark first")
-                        return
+                            settings['boss'] = [s, None]
+                        if settings['boss'][1] is None:
+                            print("Input the ID of the boss whose icon you want to display, if different (Leave blank to ignore)")
+                            s = input().lower()
+                            if s != "":
+                                settings['boss'][1] = s
+                            else:
+                                settings['boss'][1] = settings['boss'][0]
+                case "party":
+                    if gbfpib is not None:
+                        settings["gbfpib"] = gbfpib
+                        if 'lang' not in settings["gbfpib"]:
+                            return
+                    else:
+                        print("Checking clipboard for party data...")
+                        while True:
+                            try:
+                                settings["gbfpib"] = json.loads(pyperclip.paste())
+                                if 'lang' not in settings["gbfpib"]: raise Exception()
+                                break
+                            except:
+                                print("No GBFPIB data found in the clipboard")
+                                input("Export a party then press return here")
                 case "autoinput":
                     print("Select an Auto setting:")
                     print("[0] Auto")
@@ -501,16 +540,15 @@ class GBFTMR():
         self.makeThumbnail(settings, template)
 
     def makeThumbnail(self, settings, template):
-        print("[TMR] |--> Generating thumbnail...")
-        if 'bg' in settings:
-            print("[TMR] |--> Generating background for boss", settings['bg'][0])
-            img = self.generateBackground(settings['bg'][0], settings['bg'][1], settings['bg'][2])
-        else:
-            print("[TMR] |--> No backgrounds selected")
-            img = self.make_canvas((1280, 720))
+        print("[TMR] |--> Starting thumbnail generation...")
+        img = self.make_canvas((1280, 720))
         for i, e in enumerate(template):
-            print("[TMR] |--> Processing Element #{}: {}".format(i, e["type"]))
+            print("[TMR] |--> Generating Element #{}: {}".format(i+1, e["type"]))
             match e["type"]:
+                case "background":
+                    img = self.auto_background(img, settings, e)
+                case "boss":
+                    img = self.auto_boss(img, settings, e)
                 case "party":
                     img = self.auto_party(img, settings, e)
                 case "asset":
@@ -522,6 +560,24 @@ class GBFTMR():
         img.close()
         print("[TMR] |--> thumbnail.png has been generated with success")
 
+    def auto_background(self, img, settings, element):
+        if 'bg' not in settings: return img
+        bg = self.generateBackground(settings['bg'][0], settings['bg'][1], settings['bg'][2])
+        if bg is None: return img
+        modified = Image.alpha_composite(img, bg)
+        img.close()
+        bg.close()
+        return modified
+
+    def auto_boss(self, img, settings, element):
+        if 'boss' not in settings: return img
+        bg = self.generateBackground(settings['boss'][0], None, settings['boss'][1])
+        if bg is None: return img
+        modified = Image.alpha_composite(img, bg)
+        img.close()
+        bg.close()
+        return modified
+
     def auto_asset(self, img, settings, element): # auto asset parsing
         if element["asset"] is None: return img
         pos = element.get('anchor', 'topleft')
@@ -532,6 +588,7 @@ class GBFTMR():
 
     def auto_text(self, img, settings, element): # auto text parsing
         text = settings.get(element['ref'], '')
+        if text == '': return img
         fc = tuple(element.get('fontcolor', (255, 255, 255)))
         oc = tuple(element.get('outlinecolor', (255, 0, 0)))
         os = element.get('outlinesize', 10)
