@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 3]
+        self.version = [1, 4]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -143,22 +143,28 @@ class GBFTMR():
         if response.status_code != 200: raise Exception()
         return response.content
 
+    def bookmarkString(self, s):
+        if s.startswith("$$boss:"):
+            return tuple(s.replace("$$boss:", "").split('|'))
+        else:
+            return None, None, None
+
     def addBoss(self):
         print("Input an Enemy ID with a valid Appear animation (Leave blank to cancel)")
         s = input()
         if s == "": return
-        eid = s
-        bg = None
-        eico = None
-        print("Input a background file name (Leave blank to skip)")
-        s = input()
-        if s != "": bg = s
-        print("Input another Enemy ID to set a different icon (Leave blank to skip or input None to disable)")
-        s = input()
-        if s != "":
-            if s != "None": eico = s
-        else:
-            eico = eid
+        eid, bg, eico = self.bookmarkString(s)
+        if s is None:
+            eid = s
+            print("Input a background file name (Leave blank to skip)")
+            s = input()
+            if s != "": bg = s
+            print("Input another Enemy ID to set a different icon (Leave blank to skip or input None to disable)")
+            s = input()
+            if s != "":
+                if s != "None": eico = s
+            else:
+                eico = eid
         print("Generating a preview...")
         img = self.generateBackground(eid, bg, eico)
         if img is None:
@@ -411,12 +417,19 @@ class GBFTMR():
     def autoSetBG(self, options, target, value):
         if value is None: return
         t = self.getOptionTarget(options, target)
-        t["bg"] = self.boss[value]
+        data = self.bookmarkString(value)
+        if data[0]is not None:
+            t["bg"] = data
+        else:
+            t["bg"] = self.boss[value]
 
     def autoSetBoss(self, options, target, value):
         if value == "": return
         t = self.getOptionTarget(options, target)
-        if not value.isdigit() and value in self.boss:
+        data = self.bookmarkString(value)
+        if data[0]is not None:
+            t["boss"] = [data[0], data[2]]
+        elif not value.isdigit() and value in self.boss:
             t["boss"] = [self.boss[value][0], self.boss[value][2]]
         else:
             t["boss"] = [value, None]
@@ -464,25 +477,33 @@ class GBFTMR():
                     print("Input the background you want to use (Leave blank to ignore)")
                     s = input().lower()
                     if s != "":
-                        if s not in self.boss:
-                            print(s, "not found in the boss data")
-                            return
-                        settings['bg'] = self.boss[s]
+                        data = self.bookmarkString(s)
+                        if data[0] is not None:
+                            settings['bg'] = data
+                        else:
+                            if s not in self.boss:
+                                print(s, "not found in the boss data")
+                                return
+                            settings['bg'] = self.boss[s]
                 case "boss":
                     print("Input the ID of the boss you want to display (Leave blank to ignore)")
                     s = input().lower()
                     if s != "":
-                        if not s.isdigit() and s in self.boss:
-                            settings['boss'] = [self.boss[s][0], self.boss[s][2]]
+                        data = self.bookmarkString(s)
+                        if data[0] is not None:
+                            settings['boss'] = [data[0], data[2]]
                         else:
-                            settings['boss'] = [s, None]
-                        if settings['boss'][1] is None:
-                            print("Input the ID of the boss whose icon you want to display, if different (Leave blank to ignore)")
-                            s = input().lower()
-                            if s != "":
-                                settings['boss'][1] = s
+                            if not s.isdigit() and s in self.boss:
+                                settings['boss'] = [self.boss[s][0], self.boss[s][2]]
                             else:
-                                settings['boss'][1] = settings['boss'][0]
+                                settings['boss'] = [s, None]
+                            if settings['boss'][1] is None:
+                                print("Input the ID of the boss whose icon you want to display, if different (Leave blank to ignore)")
+                                s = input().lower()
+                                if s != "":
+                                    settings['boss'][1] = s
+                                else:
+                                    settings['boss'][1] = settings['boss'][0]
                 case "party":
                     if gbfpib is not None:
                         settings["gbfpib"] = gbfpib
@@ -856,11 +877,15 @@ class GBFTMR():
                 case '1':
                     print("Input the name of a Boss Fight to preview")
                     s = input().lower()
-                    if s not in self.boss:
+                    data = self.bookmarkString(s)
+                    if data[0] is None and s not in self.boss:
                         print("No result found for", s)
                     else:
                         print("Generating preview...")
-                        img = self.generateBackground(*(self.boss[s]))
+                        if data[0] is not None:
+                            img = self.generateBackground(*data)
+                        else:
+                            img = self.generateBackground(*(self.boss[s]))
                         if img is None:
                             print("An error occured, aborting...")
                         else:
@@ -884,6 +909,7 @@ class GBFTMR():
             print("[0] Generate Thumbnail")
             print("[1] Add Boss Fight")
             print("[2] Manage Boss Fights")
+            print("[3] Get Boss Bookmark")
             print("[Any] Quit")
             s = input()
             match s:
@@ -893,6 +919,12 @@ class GBFTMR():
                     self.addBoss()
                 case '2':
                     self.manageBoss()
+                case '3':
+                    pyperclip.copy("javascript:(function () { let copyListener = event => { document.removeEventListener(\"copy\", copyListener, true); event.preventDefault(); let clipboardData = event.clipboardData; clipboardData.clearData(); clipboardData.setData(\"text/plain\", \"$$boss:\"+stage.pJsnData.is_boss.split('_')[2]+\"|\"+stage.pJsnData.background.split('/')[4].split('.')[0]+\"|\"+stage.pJsnData.boss.param[0].cjs.split('_')[1]); }; document.addEventListener(\"copy\", copyListener, true); document.execCommand(\"copy\"); })();")
+                    print("Bookmark copied!")
+                    print("Make a new bookmark and paste the code in the url field")
+                    print("Use it in battle to retrieve the boss and background data")
+                    print("You can use it to set the boss thumbnail directly")
                 case _:
                     break
 
