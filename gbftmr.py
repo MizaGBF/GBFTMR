@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 4]
+        self.version = [1, 5]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -154,7 +154,7 @@ class GBFTMR():
         s = input()
         if s == "": return
         eid, bg, eico = self.bookmarkString(s)
-        if s is None:
+        if eid is None:
             eid = s
             print("Input a background file name (Leave blank to skip)")
             s = input()
