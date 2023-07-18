@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 5]
+        self.version = [1, 6]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -621,6 +621,60 @@ class GBFTMR():
         img = self.make_img_from_text(img, text, fc, oc, os, bold, italic, pos, offset, fs)
         return img
 
+    def fix_character_look(self, export, i):
+        style = ("" if str(export['cst'][i]) == '1' else "_st{}".format(export['cst'][i])) # style
+        if style != "":
+            uncap = "01"
+        else:
+            uncap = self.get_uncap_id(export['cs'][i])
+        cid = export['c'][i]
+        # SKIN FIX START ##################
+        if str(cid).startswith('371'):
+            match cid:
+                case 3710098000: # seox skin
+                    if export['cl'][i] > 80: cid = 3040035000 # eternal seox
+                    else: cid = 3040262000 # event seox
+                case 3710122000: # seofon skin
+                    cid = 3040036000 # eternal seofon
+                case 3710143000: # vikala skin
+                    if export['ce'][i] == 3: cid = 3040408000 # apply earth vikala
+                    elif export['ce'][i] == 6:
+                        if export['cl'][i] > 50: cid = 3040252000 # SSR dark vikala
+                        else: cid = 3020073000 # R dark vikala
+                case 3710154000: # clarisse skin
+                    match export['ce'][i]:
+                        case 2: cid = 3040413000 # water
+                        case 3: cid = 3040067000 # earth
+                        case 5: cid = 3040121000 # light
+                        case 6: cid = 3040206000 # dark
+                        case _: cid = 3040046000 # fire
+                case 3710165000: # diantha skin
+                    match export['ce'][i]:
+                        case 2:
+                            if export['cl'][i] > 70: cid = 3040129000 # water SSR
+                            else: cid = 3030150000 # water SR
+                        case 3: cid = 3040296000 # earth
+                case 3710172000: # tsubasa skin
+                    cid = 3040180000
+                case 3710176000: # mimlemel skin
+                    if export['ce'][i] == 1: cid = 3040292000 # apply fire mimlemel
+                    elif export['ce'][i] == 3: cid = 3030220000 # apply earth halloween mimlemel
+                    elif export['ce'][i] == 4:
+                        if export['cn'][i] in ['Mimlemel', 'ミムルメモル']: cid = 3030043000 # first sr wind mimlemel
+                        else: cid = 3030166000 # second sr wind mimlemel
+                case 3710191000: # cidala skin 1
+                    if export['ce'][i] == 3: cid = 3040377000 # apply earth cidala
+                case 3710195000: # cidala skin 2
+                    if export['ce'][i] == 3: cid = 3040377000 # apply earth cidala
+        # SKIN FIX END ##################
+        if cid in self.nullchar: 
+            if export['ce'][i] == 99:
+                return "{}_{}{}_0{}".format(cid, uncap, style, export['pce'])
+            else:
+                return "{}_{}{}_0{}".format(cid, uncap, style, export['ce'][i])
+        else:
+            return "{}_{}{}".format(cid, uncap, style)
+
     def auto_party(self, img, settings, element): # auto party drawing
         characters = []
         noskin = element.get("noskin", False)
@@ -643,11 +697,7 @@ class GBFTMR():
                     characters.append("3999999999")
                     continue
                 if noskin:
-                    if export['c'][x] in self.nullchar: 
-                        cid = "{}_{}_0{}".format(export['c'][x], self.get_uncap_id(export['cs'][x]), export['ce'][x])
-                    else:
-                        cid = "{}_{}".format(export['c'][x], self.get_uncap_id(export['cs'][x]))
-                    characters.append(cid)
+                    characters.append(self.fix_character_look(export, x))
                 else:
                     characters.append(export['ci'][x])
             if export['s'][0] is not None:
@@ -660,7 +710,6 @@ class GBFTMR():
         except Exception as e:
             print("An error occured while importing a party:", e)
             raise Exception("Failed to import party data")
-
         pos = element.get('anchor', 'topleft')
         offset = element.get('position', (0,0))
         ratio = element.get('size', 1.0)
