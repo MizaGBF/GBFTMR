@@ -22,7 +22,7 @@
             "position":[-10, -30],
             "fontsize":80,
             "bold":true,
-            "ljust": 15
+            "ljust": 14
         }
     ],
     "Guild War": [
@@ -57,7 +57,7 @@
             "fontcolor":[255,196,0],
             "outlinecolor":[0,0,0],
             "bold":true,
-            "ljust": 15
+            "ljust": 14
         }
     ],
     "Dread Barrage NM": [
@@ -87,7 +87,7 @@
             "fontcolor":[255,196,0],
             "outlinecolor":[0,0,0],
             "bold":true,
-            "ljust": 15
+            "ljust": 14
         }
     ],
     "Proving Grounds": [
