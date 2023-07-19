@@ -38,7 +38,7 @@ For `textinput`:
 * `bold`: Boolean, set to True to draw bold text  
 * `italic`: Boolean, set to True to draw italic text  
 * `ljust`: Integer, to left align string lines   
-* `rjust`: Integer, to left align string lines (Applied after `ljust`, if set)   
+* `rjust`: Integer, to right align string lines (Applied after `ljust`, if set)   
   
 ### Bosses  
 Bosses can be set in `boss.json`.  
