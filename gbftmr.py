@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 6]
+        self.version = [1, 7]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -618,7 +618,9 @@ class GBFTMR():
         pos = element.get('anchor', 'middle')
         offset = element.get('position', (0, 0))
         fs = element.get('fontsize', 120)
-        img = self.make_img_from_text(img, text, fc, oc, os, bold, italic, pos, offset, fs)
+        lj = element.get('ljust', 0)
+        rj = element.get('fontsize', 0)
+        img = self.make_img_from_text(img, text, fc, oc, os, bold, italic, pos, offset, fs, lj, rj)
         return img
 
     def fix_character_look(self, export, i):
@@ -775,7 +777,7 @@ class GBFTMR():
         img.close()
         return modified
 
-    def make_img_from_text(self, img, text = "", fc = (255, 255, 255), oc = (0, 0, 0), os = 10, bold = False, italic = False, pos = "middle", offset = (0, 0), fs = 24): # to draw text into an image
+    def make_img_from_text(self, img, text = "", fc = (255, 255, 255), oc = (0, 0, 0), os = 10, bold = False, italic = False, pos = "middle", offset = (0, 0), fs = 24, lj = 0, rj = 0): # to draw text into an image
         text = text.replace('\\n', '\n')
         modified = img.copy()
         d = ImageDraw.Draw(modified, 'RGBA')
@@ -785,10 +787,13 @@ class GBFTMR():
         font = ImageFont.truetype(self.path + "assets/" + font_file + ".ttf", fs, encoding="unic")
         nl = text.split('\n')
         size = [0, 0]
-        for l in nl:
-            s = font.getbbox(l, stroke_width=os)
+        for i in range(len(nl)):
+            if lj > 0: nl[i] = nl[i].ljust(lj)
+            if rj > 0: nl[i] = nl[i].rjust(rj)
+            s = font.getbbox(nl[i], stroke_width=os)
             size[0] = max(size[0], s[2]-s[0])
             size[1] += s[3]-s[1] + 10
+        text = '\n'.join(nl)
         size[1] = int(size[1] * 1.15)
         match pos.lower():
             case "topleft":

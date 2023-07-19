@@ -1,6 +1,9 @@
 {
     "Showcase": [
         {
+            "type":"background"
+        },
+        {
             "type":"party",
             "size":1.4,
             "anchor":"top",
@@ -18,10 +21,14 @@
             "anchor":"bottomright",
             "position":[-10, -30],
             "fontsize":80,
-            "bold":true
+            "bold":true,
+            "ljust": 15
         }
     ],
     "Guild War": [
+        {
+            "type":"background"
+        },
         {
             "type":"party",
             "size":1.4,
@@ -49,7 +56,8 @@
             "fontsize":80,
             "fontcolor":[255,196,0],
             "outlinecolor":[0,0,0],
-            "bold":true
+            "bold":true,
+            "ljust": 15
         }
     ],
     "Dread Barrage NM": [
@@ -78,7 +86,8 @@
             "fontsize":80,
             "fontcolor":[255,196,0],
             "outlinecolor":[0,0,0],
-            "bold":true
+            "bold":true,
+            "ljust": 15
         }
     ],
     "Proving Grounds": [
@@ -121,10 +130,13 @@
             "anchor":"topleft"
         },
         {
+            "type":"boss"
+        },
+        {
             "type":"textinput",
             "ref":"Floor Text",
             "anchor":"topleft",
-            "position":[20, 20],
+            "position":[20, 10],
             "fontsize":100,
             "fontcolor":[255,255,255],
             "outlinecolor":[0,0,0],
@@ -142,7 +154,7 @@
             "type":"textinput",
             "ref":"Thumbnail Text",
             "anchor":"bottomleft",
-            "position":[60, -30],
+            "position":[170, -20],
             "fontsize":100,
             "bold":true
         }

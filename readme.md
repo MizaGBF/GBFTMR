@@ -37,6 +37,8 @@ For `textinput`:
 * `outlinesize`: Integer, size of the text outline (Default is 10)  
 * `bold`: Boolean, set to True to draw bold text  
 * `italic`: Boolean, set to True to draw italic text  
+* `ljust`: Integer, to left align string lines   
+* `rjust`: Integer, to left align string lines (Applied after `ljust`, if set)   
   
 ### Bosses  
 Bosses can be set in `boss.json`.  
