@@ -158,5 +158,40 @@
             "fontsize":100,
             "bold":true
         }
+    ],
+    "Pride of the Ascendant": [
+        {
+            "type":"background"
+        },
+        {
+            "type":"party",
+            "size":1.4,
+            "anchor":"top",
+            "position":[-50, 140],
+            "noskin":true
+        },
+        {
+            "type":"prideinput",
+            "size":1.2,
+            "anchor":"bottomleft",
+            "position":[5, -5]
+        },
+        {
+            "type":"autoinput",
+            "size":3,
+            "anchor":"bottomleft",
+            "position":[200, -25]
+        },
+        {
+            "type":"textinput",
+            "ref":"Thumbnail Text",
+            "anchor":"bottomright",
+            "position":[-10, -30],
+            "fontsize":80,
+            "fontcolor":[255,196,0],
+            "outlinecolor":[0,0,0],
+            "bold":true,
+            "ljust": 14
+        }
     ]
 }

@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 7]
+        self.version = [1, 8]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -393,6 +393,10 @@ class GBFTMR():
                     options["choices"].append(["GW ID", None, None, "template-"+str(i), self.autoSetGW])
                     options["choices"].append(["NM Setting", ["None", "NM90", "NM95", "NM100", "NM150", "NM200"], [None, 90, 95, 100, 150, 200], "template-"+str(i), self.autoSetNM])
                     e["type"] = "asset"
+                case "prideinput":
+                    options["choices"].append(["Pride ID", ["Gilbert", "Nalhe Great Wall", "Violet Knight", "Echidna", "Golden Knight", "White Knight", "Cherub", "Kikuri", "Zwei", "??? (10)", "??? (12)", "??? (12)"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "template-"+str(i), self.autoSetPrideID])
+                    options["choices"].append(["Pride Difficulty", ["Proud", "Proud+"], [False, True], "template-"+str(i), self.autoSetPrideDifficulty])
+                    e["type"] = "asset"
                 case "textinput":
                     options["choices"].append([e["ref"], None, None, "choices-"+str(len(options["choices"])), self.autoSetText])
         return options
@@ -456,6 +460,17 @@ class GBFTMR():
             t["asset"] = value
         else:
             t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(t["gwn"], t["gwn"], value)
+
+    def autoSetPrideID(self, options, target, value):
+        t = self.getOptionTarget(options, target)
+        t["pridenum"] = str(value).zfill(3)
+
+    def autoSetPrideDifficulty(self, options, target, value):
+        t = self.getOptionTarget(options, target)
+        if value is None:
+            t["asset"] = value
+        else:
+            t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/quest/assets/free/conquest_{}_proud{}.png".format(t["pridenum"], "plus" if value else "")
 
     # end of GBFPIB compatibility
 
@@ -555,6 +570,27 @@ class GBFTMR():
                         gwn = input().zfill(3)
                         e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(gwn, gwn, nm)
                         e["type"] = "asset"
+                case "prideinput":
+                    print("Select a Difficulty:")
+                    print("[0] Proud")
+                    print("[Any] Proud+")
+                    match input():
+                        case "0": p = ""
+                        case _: p = "plus"
+                    print("Input Pride Number:")
+                    print("[1] Gilbert")
+                    print("[2] Nalhe Great Wall")
+                    print("[3] Violet Knight")
+                    print("[4] Echidna")
+                    print("[5] Golden Knight")
+                    print("[6] White Knight")
+                    print("[7] Cherub")
+                    print("[8] Kikuri")
+                    print("[9] Zwei")
+                    print("[Any] Anything Else")
+                    pn = input().zfill(3)
+                    e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/quest/assets/free/conquest_{}_proud{}.png".format(str(pn).zfill(3), p)
+                    e["type"] = "asset"
                 case "textinput":
                     print("Input the '{}'".format(e["ref"]))
                     settings[e["ref"]] = input()
