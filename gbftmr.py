@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 8]
+        self.version = [1, 9]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -153,16 +153,33 @@ class GBFTMR():
         print("Input an Enemy ID with a valid Appear animation (Leave blank to cancel)")
         s = input()
         if s == "": return
+        if s.lower() == "cc":
+            try:
+                s = pyperclip.paste()
+            except:
+                s = "cc"
         eid, bg, eico = self.bookmarkString(s)
         if eid is None:
             eid = s
             print("Input a background file name (Leave blank to skip)")
             s = input()
-            if s != "": bg = s
+            if s.lower() == "cc":
+                try:
+                    s = pyperclip.paste()
+                except:
+                    s = "cc"
+            elif s != "":
+                bg = s
             print("Input another Enemy ID to set a different icon (Leave blank to skip or input None to disable)")
             s = input()
             if s != "":
-                if s != "None": eico = s
+                if s != "None":
+                    if s.lower() == "cc":
+                        try:
+                            s = pyperclip.paste()
+                        except:
+                            s = "cc"
+                    eico = s
             else:
                 eico = eid
         print("Generating a preview...")
