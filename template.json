@@ -188,8 +188,6 @@
             "anchor":"bottomright",
             "position":[-10, -30],
             "fontsize":80,
-            "fontcolor":[255,196,0],
-            "outlinecolor":[0,0,0],
             "bold":true,
             "ljust": 14
         }
