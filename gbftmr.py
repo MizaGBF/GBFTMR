@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 9]
+        self.version = [1, 10]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -287,17 +287,23 @@ class GBFTMR():
                 background = None
             
             # debug
-            """for k in elements:
-                print(k, elements[k])"""
+            if False:
+                for k in elements:
+                    print(k, elements[k])
             
             # mostly fixes for diaspora, sieg etc...
-            parts = ['boss', 'bg', 'vs', 'name_a']
+            parts = []
+            for p in ['boss', 'bg', 'vs', 'name_a', 'name_b']:
+                if p in elements:
+                    parts.append(p)
             if 'vs_bg' in elements:
                 parts[1] = 'vs_bg'
                 parts.insert(0, 'bg')
             name_y_off = 0
             if 'name_a' in elements:
                 name_y_off = int(max(135, elements['name_a'][3] - elements['name_a'][1])) - 135
+            if 'name_b' in elements:
+                name_y_off = int(max(135, elements['name_b'][3] - elements['name_b'][1])) - 135
             if 'boss_a' in elements:
                 name_y_off = int(max(135, elements['boss_a'][3] - elements['boss_a'][1])) - 135
                 parts[-1] = 'boss_a'
@@ -334,6 +340,8 @@ class GBFTMR():
                             offset = ((640 - crop.size[0]) // 2, 540-name_y_off)
                         case 'name_a':
                             offset = ((640 - crop.size[0]) // 2, 450-name_y_off)
+                        case 'name_b':
+                            offset = ((640 - crop.size[0]) // 2, 490-name_y_off)
                         case 'boss_a':
                             offset = ((640 - crop.size[0]) // 2, 440-name_y_off)
                         case 'name_vs':
