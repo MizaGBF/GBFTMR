@@ -27,6 +27,12 @@
     ],
     "GW / Dread": [
         {
+            "type":"asset",
+            "asset":"dread barrage.png",
+            "anchor":"topleft",
+            "comment":"It will display if no background is set"
+        },
+        {
             "type":"background"
         },
         {

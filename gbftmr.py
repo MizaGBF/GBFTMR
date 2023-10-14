@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 11]
+        self.version = [1, 12]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -416,7 +416,7 @@ class GBFTMR():
                     e["type"] = "asset"
                 case "nminput":
                     options["choices"].append(["GW or DB ID", None, None, "template-"+str(i), self.autoSetGW])
-                    options["choices"].append(["NM Setting", ["None", "NM90", "NM95", "NM100", "NM150", "NM200", "UF95", "UF135", "UF175"], [None, 90, 95, 100, 150, 200, 1, 2, 3], "template-"+str(i), self.autoSetNM])
+                    options["choices"].append(["NM Setting", ["None", "GW NM90", "GW NM95", "GW NM100", "GW NM150", "GW NM200", "DB 1*", "DB 2*", "DB 3*", "DB 4*", "DB 5*", "DB UF95", "DB UF135", "DB UF175"], [None, 90, 95, 100, 150, 200, 1, 2, 3, 4, 5, 11, 12, 13], "template-"+str(i), self.autoSetNM])
                     e["type"] = "asset"
                 case "prideinput":
                     options["choices"].append(["Pride ID", ["Gilbert", "Nalhe Great Wall", "Violet Knight", "Echidna", "Golden Knight", "White Knight", "Cherub", "Kikuri", "Zwei", "??? (10)", "??? (12)", "??? (12)"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "template-"+str(i), self.autoSetPrideID])
@@ -485,7 +485,9 @@ class GBFTMR():
             t["asset"] = value
         else:
             if value < 10:
-                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_strong{}.png".format(t["gwn"].zfill(2), value)
+                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img_low/sp/assets/summon/qm/teamforce{}_star{}.png".format(t["gwn"].zfill(2), value)
+            elif value < 20:
+                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_strong{}.png".format(t["gwn"].zfill(2), int(value)-10)
             else:
                 t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(t["gwn"].zfill(3), t["gwn"].zfill(3), value)
 
@@ -579,15 +581,20 @@ class GBFTMR():
                             e["asset"] = None
                     e["type"] = "asset"
                 case "nminput":
-                    print("Select a GW NM or DB UF:")
-                    print("[0] NM90")
-                    print("[1] NM95")
-                    print("[2] NM100")
-                    print("[3] NM150")
-                    print("[4] NM200")
-                    print("[5] UF95")
-                    print("[6] UF135")
-                    print("[7] UF175")
+                    print("Select a GW NM or DB Foe:")
+                    print("[0] GW NM90")
+                    print("[1] GW NM95")
+                    print("[2] GW NM100")
+                    print("[3] GW NM150")
+                    print("[4] GW NM200")
+                    print("[5] DB 1*")
+                    print("[6] DB 2*")
+                    print("[7] DB 3*")
+                    print("[8] DB 4*")
+                    print("[9] DB 5*")
+                    print("[10] DB UF95")
+                    print("[11] DB UF135")
+                    print("[12] DB UF175")
                     print("[Any] Skip")
                     match input():
                         case "0": nm = 90
@@ -598,12 +605,19 @@ class GBFTMR():
                         case "5": nm = 1
                         case "6": nm = 2
                         case "7": nm = 3
+                        case "8": nm = 4
+                        case "9": nm = 5
+                        case "10": nm = 11
+                        case "11": nm = 12
+                        case "12": nm = 13
                         case _: nm = None
                     if nm is not None:
                         print("Input a GW or DB ID:")
                         gwn = input()
                         if nm < 10:
-                            e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_strong{}.png".format(gwn.zfill(2), nm)
+                            e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_star{}.png".format(gwn.zfill(2), nm)
+                        elif nm < 20:
+                            e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_strong{}.png".format(gwn.zfill(2), nm-10)
                         else:
                             e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(gwnn.zfill(3), gwnn.zfill(3), nm)
                         e["type"] = "asset"
