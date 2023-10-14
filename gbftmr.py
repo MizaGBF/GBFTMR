@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 10]
+        self.version = [1, 11]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -415,8 +415,8 @@ class GBFTMR():
                     options["choices"].append(["Auto Setting", ["Manual", "Auto", "Full Auto", "Full Auto Guard"], [None, "auto.png", "fa.png", "fa_guard.png"], "template-"+str(i), self.autoSetAsset])
                     e["type"] = "asset"
                 case "nminput":
-                    options["choices"].append(["GW ID", None, None, "template-"+str(i), self.autoSetGW])
-                    options["choices"].append(["NM Setting", ["None", "NM90", "NM95", "NM100", "NM150", "NM200"], [None, 90, 95, 100, 150, 200], "template-"+str(i), self.autoSetNM])
+                    options["choices"].append(["GW or DB ID", None, None, "template-"+str(i), self.autoSetGW])
+                    options["choices"].append(["NM Setting", ["None", "NM90", "NM95", "NM100", "NM150", "NM200", "UF95", "UF135", "UF175"], [None, 90, 95, 100, 150, 200, 1, 2, 3], "template-"+str(i), self.autoSetNM])
                     e["type"] = "asset"
                 case "prideinput":
                     options["choices"].append(["Pride ID", ["Gilbert", "Nalhe Great Wall", "Violet Knight", "Echidna", "Golden Knight", "White Knight", "Cherub", "Kikuri", "Zwei", "??? (10)", "??? (12)", "??? (12)"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "template-"+str(i), self.autoSetPrideID])
@@ -477,14 +477,17 @@ class GBFTMR():
 
     def autoSetGW(self, options, target, value):
         t = self.getOptionTarget(options, target)
-        t["gwn"] = value.zfill(3)
+        t["gwn"] = value
 
     def autoSetNM(self, options, target, value):
         t = self.getOptionTarget(options, target)
         if value is None:
             t["asset"] = value
         else:
-            t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(t["gwn"], t["gwn"], value)
+            if value < 10:
+                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_strong{}.png".format(t["gwn"].zfill(2), value)
+            else:
+                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(t["gwn"].zfill(3), t["gwn"].zfill(3), value)
 
     def autoSetPrideID(self, options, target, value):
         t = self.getOptionTarget(options, target)
@@ -576,12 +579,15 @@ class GBFTMR():
                             e["asset"] = None
                     e["type"] = "asset"
                 case "nminput":
-                    print("Select a NM:")
+                    print("Select a GW NM or DB UF:")
                     print("[0] NM90")
                     print("[1] NM95")
                     print("[2] NM100")
                     print("[3] NM150")
                     print("[4] NM200")
+                    print("[5] UF95")
+                    print("[6] UF135")
+                    print("[7] UF175")
                     print("[Any] Skip")
                     match input():
                         case "0": nm = 90
@@ -589,11 +595,17 @@ class GBFTMR():
                         case "2": nm = 100
                         case "3": nm = 150
                         case "4": nm = 200
+                        case "5": nm = 1
+                        case "6": nm = 2
+                        case "7": nm = 3
                         case _: nm = None
                     if nm is not None:
-                        print("Input GW Number:")
-                        gwn = input().zfill(3)
-                        e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(gwn, gwn, nm)
+                        print("Input a GW or DB ID:")
+                        gwn = input()
+                        if nm < 10:
+                            e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_strong{}.png".format(gwn.zfill(2), nm)
+                        else:
+                            e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(gwnn.zfill(3), gwnn.zfill(3), nm)
                         e["type"] = "asset"
                 case "prideinput":
                     print("Select a Difficulty:")
