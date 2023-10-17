@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 12]
+        self.version = [1, 13]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -1008,12 +1008,15 @@ class GBFTMR():
                 case '0':
                     print("Input keywords to search")
                     s = input().lower().split(" ")
-                    print("Listing bosses matching the keywords")
+                    print("Listing bosses matching the keywords...")
+                    c = 0
                     for k in self.boss:
                         for i in s:
                             if i in k:
-                                print(k)
+                                print("*", k)
+                                c += 1
                                 break
+                    print(c, "positive result(s)")
                     print("Done")
                 case '1':
                     print("Input the name of a Boss Fight to preview")
@@ -1061,7 +1064,7 @@ class GBFTMR():
                 case '2':
                     self.manageBoss()
                 case '3':
-                    pyperclip.copy("javascript:(function () { let copyListener = event => { document.removeEventListener(\"copy\", copyListener, true); event.preventDefault(); let clipboardData = event.clipboardData; clipboardData.clearData(); clipboardData.setData(\"text/plain\", \"$$boss:\"+stage.pJsnData.is_boss.split('_')[2]+\"|\"+stage.pJsnData.background.split('/')[4].split('.')[0]+\"|\"+stage.pJsnData.boss.param[0].cjs.split('_')[1]); }; document.addEventListener(\"copy\", copyListener, true); document.execCommand(\"copy\"); })();")
+                    pyperclip.copy("javascript:(function () { let copyListener = event => { document.removeEventListener(\"copy\", copyListener, true); event.preventDefault(); let clipboardData = event.clipboardData; clipboardData.clearData(); clipboardData.setData(\"text/plain\", \"$$boss:\"+(stage.pJsnData.is_boss != null ? stage.pJsnData.is_boss.split('_')[2] : stage.pJsnData.boss.param[0].cjs.split('_')[1])+\"|\"+stage.pJsnData.background.split('/')[4].split('.')[0]+\"|\"+stage.pJsnData.boss.param[0].cjs.split('_')[1]); }; document.addEventListener(\"copy\", copyListener, true); document.execCommand(\"copy\"); })();")
                     print("Bookmark copied!")
                     print("Make a new bookmark and paste the code in the url field")
                     print("Use it in battle to retrieve the boss and background data")
