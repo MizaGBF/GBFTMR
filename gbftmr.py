@@ -1075,7 +1075,7 @@ class GBFTMR():
                 case '2':
                     self.manageBoss()
                 case '3':
-                    pyperclip.copy("javascript:(function () { let copyListener = event => { document.removeEventListener(\"copy\", copyListener, true); event.preventDefault(); let clipboardData = event.clipboardData; clipboardData.clearData(); clipboardData.setData(\"text/plain\", \"$$boss:\"+(stage.pJsnData.is_boss != null ? stage.pJsnData.is_boss.split('_')[2] : stage.pJsnData.boss.param[0].cjs.split('_')[1])+\"|\"+stage.pJsnData.background.split('/')[4].split('.')[0]+\"|\"+stage.pJsnData.boss.param[0].cjs.split('_')[1]); }; document.addEventListener(\"copy\", copyListener, true); document.execCommand(\"copy\"); })();")
+                    pyperclip.copy("javascript:(function () { let copyListener = event => { document.removeEventListener(\"copy\", copyListener, true); event.preventDefault(); let clipboardData = event.clipboardData; clipboardData.clearData(); clipboardData.setData(\"text/plain\", \"$$boss:\"+(stage.pJsnData.is_boss != null ? stage.pJsnData.is_boss.split(\"_\").slice(2).join(\"_\") : stage.pJsnData.boss.param[0].cjs.split(\"_\")[1])+\"|\"+stage.pJsnData.background.split(\"/\")[4].split(\".\")[0]+\"|\"+stage.pJsnData.boss.param[0].cjs.split(\"_\")[1]); }; document.addEventListener(\"copy\", copyListener, true); document.execCommand(\"copy\"); })();")
                     print("Bookmark copied!")
                     print("Make a new bookmark and paste the code in the url field")
                     print("Use it in battle to retrieve the boss and background data")
