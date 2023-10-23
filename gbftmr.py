@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 14]
+        self.version = [1, 15]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -242,8 +242,13 @@ class GBFTMR():
 
     def generateBackground(self, eid, bg, eico):
         try:
-            cjs = self.getAsset("https://prd-game-a3-granbluefantasy.akamaized.net/assets_en/js_low/cjs/raid_appear_{}.js".format(eid)).decode('utf-8')
-            token = "raid_appear_"+eid+"_"
+            if "_" in eid:
+                ext = "_"+eid.split("_")[1]
+                eid = eid.split("_")[0]
+            else:
+                ext = ""
+            cjs = self.getAsset("https://prd-game-a3-granbluefantasy.akamaized.net/assets_en/js_low/cjs/raid_appear_{}{}.js".format(eid, ext)).decode('utf-8')
+            token = "raid_appear_"+eid+ext+"_"
             pos = 0
             elements = {}
             while True:
@@ -311,7 +316,7 @@ class GBFTMR():
             if 'jp' in elements: parts.append('jp')
             if 'en' in elements: parts.append('en')
             
-            with BytesIO(self.getAsset("https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/cjs/raid_appear_{}.png".format(eid))) as img_data:
+            with BytesIO(self.getAsset("https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/cjs/raid_appear_{}{}.png".format(eid, ext))) as img_data:
                 appear = Image.open(img_data)
                 tmp = appear.convert('RGBA')
                 appear.close()
