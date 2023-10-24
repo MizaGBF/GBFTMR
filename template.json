@@ -109,6 +109,13 @@
             "type":"boss"
         },
         {
+            "type":"party",
+            "size":1.4,
+            "anchor":"top",
+            "position":[50, 60],
+            "noskin":true
+        },
+        {
             "type":"textinput",
             "ref":"Floor Text",
             "anchor":"topleft",
@@ -118,13 +125,6 @@
             "outlinecolor":[0,0,0],
             "outlinesize":8,
             "bold":true
-        },
-        {
-            "type":"party",
-            "size":1.4,
-            "anchor":"top",
-            "position":[50, 60],
-            "noskin":true
         },
         {
             "type":"textinput",

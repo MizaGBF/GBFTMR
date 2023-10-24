@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 15]
+        self.version = [1, 16]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -717,7 +717,7 @@ class GBFTMR():
         offset = element.get('position', (0, 0))
         fs = element.get('fontsize', 120)
         lj = element.get('ljust', 0)
-        rj = element.get('fontsize', 0)
+        rj = element.get('rjust', 0)
         img = self.make_img_from_text(img, text, fc, oc, os, bold, italic, pos, offset, fs, lj, rj)
         return img
 
