@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 18]
+        self.version = [1, 19]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -526,17 +526,26 @@ class GBFTMR():
         for e in template:
             match e["type"]:
                 case "background":
-                    print("Input the background you want to use (Leave blank to ignore)")
-                    s = input().lower()
-                    if s != "":
-                        data = self.bookmarkString(s)
-                        if data[0] is not None:
-                            settings['bg'] = data
+                    while True:
+                        print("Input the background you want to use (Leave blank to ignore)")
+                        s = input().lower()
+                        if s == "":
+                            break
                         else:
-                            if s not in self.boss:
-                                print(s, "not found in the boss data")
-                                return
-                            settings['bg'] = self.boss[s]
+                            data = self.bookmarkString(s)
+                            if data[0] is not None:
+                                settings['bg'] = data
+                                break
+                            else:
+                                if s not in self.boss:
+                                    print(s, "not found in the boss data")
+                                    r = self.search_boss(s)
+                                    if len(r) > 0:
+                                        print("Did you mean...?")
+                                        print("*", "\n* ".join(r))
+                                else:
+                                    settings['bg'] = self.boss[s]
+                                    break
                 case "boss":
                     print("Input the ID of the boss you want to display (Leave blank to ignore)")
                     s = input().lower()
@@ -1006,6 +1015,16 @@ class GBFTMR():
         del buffers
         return modified
 
+    def search_boss(self, search):
+        s = search.lower().split(" ")
+        r = []
+        for k in self.boss:
+            for i in s:
+                if i in k:
+                    r.append(k)
+                    break
+        return r
+
     def manageBoss(self):
         while True:
             print("")
@@ -1018,17 +1037,11 @@ class GBFTMR():
             match s:
                 case '0':
                     print("Input keywords to search")
-                    s = input().lower().split(" ")
-                    print("Listing bosses matching the keywords...")
-                    c = 0
-                    for k in self.boss:
-                        for i in s:
-                            if i in k:
-                                print("*", k)
-                                c += 1
-                                break
-                    print(c, "positive result(s)")
-                    print("Done")
+                    r = self.search_boss(input())
+                    if len(r) > 0:
+                        print("Listing bosses matching the keywords...")
+                        print("*", "\n* ".join(r))
+                    print(len(r), "positive result(s)")
                 case '1':
                     print("Input the name of a Boss Fight to preview")
                     s = input().lower()
