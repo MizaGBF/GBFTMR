@@ -1062,6 +1062,7 @@ class GBFTMR():
                             print("Done")
                 case '2':
                     print("Input the name of a Boss Fight to delete")
+                    s = input()
                     if s in self.boss:
                         self.boss.pop(s)
                         self.saveBosses()
