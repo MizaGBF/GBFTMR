@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 16]
+        self.version = [1, 17]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -247,7 +247,7 @@ class GBFTMR():
                 eid = eid.split("_")[0]
             else:
                 ext = ""
-            cjs = self.getAsset("https://prd-game-a3-granbluefantasy.akamaized.net/assets_en/js_low/cjs/raid_appear_{}{}.js".format(eid, ext)).decode('utf-8')
+            cjs = self.getAsset("https://prd-game-a3-granbluefantasy.akamaized.net/assets_en/js/cjs/raid_appear_{}{}.js".format(eid, ext)).decode('utf-8')
             token = "raid_appear_"+eid+ext+"_"
             pos = 0
             elements = {}
@@ -630,7 +630,7 @@ class GBFTMR():
                         elif nm == 20:
                             e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_sp.png".format(gwn.zfill(2))
                         else:
-                            e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(gwnn.zfill(3), gwnn.zfill(3), nm)
+                            e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(gwn.zfill(3), gwn.zfill(3), nm)
                         e["type"] = "asset"
                 case "prideinput":
                     print("Select a Difficulty:")
