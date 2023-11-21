@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 19]
+        self.version = [1, 20]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -326,11 +326,10 @@ class GBFTMR():
                     crop = appear.crop(tuple(elements[k]))
                     match k:
                         case 'boss':
-                            mod = 720/crop.size[0]
-                            if mod > 1:
-                                tmp = crop.resize((int(crop.size[0]*mod), int(crop.size[1]*mod)), Image.Resampling.LANCZOS)
-                                crop.close()
-                                crop = tmp
+                            mod = min(720/crop.size[0], 720/crop.size[1])
+                            tmp = crop.resize((int(crop.size[0]*mod), int(crop.size[1]*mod)), Image.Resampling.LANCZOS)
+                            crop.close()
+                            crop = tmp
                             offset = (-20, 0)
                         case 'bg':
                             if k == parts[0]: offset = (0, 0)
@@ -1020,7 +1019,7 @@ class GBFTMR():
         r = []
         for k in self.boss:
             for i in s:
-                if i in k:
+                if i != "" and i in k:
                     r.append(k)
                     break
         return r
