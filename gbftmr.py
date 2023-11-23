@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 20]
+        self.version = [1, 21]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -191,7 +191,7 @@ class GBFTMR():
             img.show()
             img.close()
         while True:
-            print("Input a name to save those settings (Leave blank to cancel)")
+            print("Input a boss name to save those settings (Leave blank to cancel)")
             s = input().lower()
             if s == "": return
             if s in self.boss:
@@ -534,6 +534,17 @@ class GBFTMR():
                             data = self.bookmarkString(s)
                             if data[0] is not None:
                                 settings['bg'] = data
+                                while True:
+                                    print("Input a boss name to save those settings (Leave blank to ignore)")
+                                    s = input().lower()
+                                    if s == "": break
+                                    elif s in self.boss:
+                                        print(s, "already exists, overwrite? ('y' to confirm)")
+                                        if input().lower() != 'y':
+                                            continue
+                                    self.boss[s] = data
+                                    self.saveBosses()
+                                    break
                                 break
                             else:
                                 if s not in self.boss:
@@ -552,6 +563,17 @@ class GBFTMR():
                         data = self.bookmarkString(s)
                         if data[0] is not None:
                             settings['boss'] = [data[0], data[2]]
+                            while True:
+                                print("Input a boss name to save those settings (Leave blank to ignore)")
+                                s = input().lower()
+                                if s == "": break
+                                elif s in self.boss:
+                                    print(s, "already exists, overwrite? ('y' to confirm)")
+                                    if input().lower() != 'y':
+                                        continue
+                                self.boss[s] = data
+                                self.saveBosses()
+                                break
                         else:
                             if not s.isdigit() and s in self.boss:
                                 settings['boss'] = [self.boss[s][0], self.boss[s][2]]
