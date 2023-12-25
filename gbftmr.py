@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 21]
+        self.version = [1, 22]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -301,12 +301,37 @@ class GBFTMR():
             for p in ['boss', 'bg', 'vs', 'name_a', 'name_b']:
                 if p in elements:
                     parts.append(p)
+            if 'opq_boss' in elements: # salmun golem
+                found = False
+                for i in range(len(parts)):
+                    if parts[i] == 'boss':
+                        parts[i] = 'opq_boss'
+                        found = True
+                        break
+                if not found: parts.append('opq_boss')
             if 'vs_bg' in elements:
                 parts[1] = 'vs_bg'
                 parts.insert(0, 'bg')
+            if 'opq_vs' in elements: # salmun golem
+                found = False
+                for i in range(len(parts)):
+                    if parts[i] == 'vs':
+                        parts[i] = 'opq_vs'
+                        found = True
+                        break
+                if not found: parts.append('opq_vs')
             name_y_off = 0
             if 'name_a' in elements:
                 name_y_off = int(max(135, elements['name_a'][3] - elements['name_a'][1])) - 135
+            if 'opq_name_a' in elements: # salmun golem
+                found = False
+                for i in range(len(parts)):
+                    if parts[i] == 'name_a':
+                        parts[i] = 'opq_name_a'
+                        found = True
+                        break
+                if not found: parts.append('opq_name_a')
+                name_y_off = int(max(135, elements['opq_name_a'][3] - elements['opq_name_a'][1])) - 135
             if 'name_b' in elements:
                 name_y_off = int(max(135, elements['name_b'][3] - elements['name_b'][1])) - 135
             if 'boss_a' in elements:
@@ -315,7 +340,7 @@ class GBFTMR():
             if 'name_vs' in elements: parts.append('name_vs')
             if 'jp' in elements: parts.append('jp')
             if 'en' in elements: parts.append('en')
-            
+            print(parts)
             with BytesIO(self.getAsset("https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/cjs/raid_appear_{}{}.png".format(eid, ext))) as img_data:
                 appear = Image.open(img_data)
                 tmp = appear.convert('RGBA')
@@ -325,7 +350,7 @@ class GBFTMR():
                 for k in parts:
                     crop = appear.crop(tuple(elements[k]))
                     match k:
-                        case 'boss':
+                        case 'boss'|'opq_boss':
                             mod = min(720/crop.size[0], 720/crop.size[1])
                             tmp = crop.resize((int(crop.size[0]*mod), int(crop.size[1]*mod)), Image.Resampling.LANCZOS)
                             crop.close()
@@ -334,15 +359,13 @@ class GBFTMR():
                         case 'bg':
                             if k == parts[0]: offset = (0, 0)
                             else: offset = ((640 - crop.size[0]) // 2, 360-name_y_off)
-                        case 'vs':
+                        case 'vs'|'vs_bg'|'opq_vs':
                             offset = ((640 - crop.size[0]) // 2, 350-name_y_off)
-                        case 'vs_bg':
-                            offset = ((640 - crop.size[0]) // 2, 300-name_y_off)
                         case 'jp':
                             offset = ((640 - crop.size[0]) // 2, 480-name_y_off)
                         case 'en':
                             offset = ((640 - crop.size[0]) // 2, 540-name_y_off)
-                        case 'name_a':
+                        case 'name_a'|'opq_name_a':
                             offset = ((640 - crop.size[0]) // 2, 450-name_y_off)
                         case 'name_b':
                             offset = ((640 - crop.size[0]) // 2, 490-name_y_off)
