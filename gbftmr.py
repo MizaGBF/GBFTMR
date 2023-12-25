@@ -340,7 +340,7 @@ class GBFTMR():
             if 'name_vs' in elements: parts.append('name_vs')
             if 'jp' in elements: parts.append('jp')
             if 'en' in elements: parts.append('en')
-            print(parts)
+
             with BytesIO(self.getAsset("https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/cjs/raid_appear_{}{}.png".format(eid, ext))) as img_data:
                 appear = Image.open(img_data)
                 tmp = appear.convert('RGBA')
@@ -359,8 +359,10 @@ class GBFTMR():
                         case 'bg':
                             if k == parts[0]: offset = (0, 0)
                             else: offset = ((640 - crop.size[0]) // 2, 360-name_y_off)
-                        case 'vs'|'vs_bg'|'opq_vs':
+                        case 'vs'|'opq_vs':
                             offset = ((640 - crop.size[0]) // 2, 350-name_y_off)
+                        case 'vs_bg':
+                            offset = ((640 - crop.size[0]) // 2, 300-name_y_off)
                         case 'jp':
                             offset = ((640 - crop.size[0]) // 2, 480-name_y_off)
                         case 'en':
