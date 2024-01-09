@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 22]
+        self.version = [1, 23]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -105,7 +105,9 @@ class GBFTMR():
         self.possible_pos = ["topleft", "left", "bottomleft", "bottom", "bottomright", "right", "topright", "top", "middle"]
         self.possible_display = ["squareicon", "partyicon", "fullart", "homeart", "skycompass"]
         self.boss = {}
+        self.stamp = {}
         self.loadBosses()
+        self.loadStamps()
         self.template = {}
         self.loadTemplates()
         tmp = Image.open(self.path+"assets/mask.png")
@@ -131,6 +133,21 @@ class GBFTMR():
             with open(self.path+"boss.json", mode="w", encoding="utf-8") as f:
                 json.dump(self.boss, f, ensure_ascii=False)
             print("'boss.json' updated")
+        except:
+            pass
+
+    def loadStamps(self):
+        try:
+            with open(self.path+"stamp.json", mode="r", encoding="utf-8") as f:
+                self.stamp = json.load(f)
+        except:
+            pass
+
+    def saveStamps(self):
+        try:
+            with open(self.path+"stamp.json", mode="w", encoding="utf-8") as f:
+                json.dump(self.stamp, f, ensure_ascii=False)
+            print("'stamp.json' updated")
         except:
             pass
 
@@ -200,6 +217,34 @@ class GBFTMR():
                     continue
             self.boss[s] = [eid, bg, eico]
             self.saveBosses()
+            break
+
+    def addStamp(self):
+        while True:
+            print("Input a stamp url (Leave blank to cancel)")
+            s = input()
+            if s == "": return
+            if s.lower() == "cc":
+                try:
+                    s = pyperclip.paste()
+                except:
+                    s = "cc"
+            try:
+                self.getAsset(s)
+                url = s
+                break
+            except:
+                print("Invalid URL")
+        while True:
+            print("Input a stamp name to save those settings (Leave blank to cancel)")
+            s = input().lower()
+            if s == "": return
+            if s in self.stamp:
+                print(s, "already exists, overwrite? ('y' to confirm)")
+                if input().lower() != 'y':
+                    continue
+            self.stamp[s] = url
+            self.saveStamps()
             break
 
     def get_mc_job_look(self, skin, job): # get the MC unskined filename based on id
@@ -440,6 +485,9 @@ class GBFTMR():
                 case "boss":
                     options["choices"].append(["Boss ID", None, None, "settings", self.autoSetBoss])
                     options["choices"].append(["Boss Icon", None, None, "settings", self.autoSetBossIcon])
+                case "stamp":
+                    options["choices"].append(["Stamp", ["None"]+list(self.stamp.keys()), [None]+list(self.stamp.keys()), "template-"+str(i), self.autoSetStamp])
+                    e["type"] = "asset"
                 case "autoinput":
                     options["choices"].append(["Auto Setting", ["Manual", "Auto", "Full Auto", "Full Auto Guard"], [None, "auto.png", "fa.png", "fa_guard.png"], "template-"+str(i), self.autoSetAsset])
                     e["type"] = "asset"
@@ -480,6 +528,12 @@ class GBFTMR():
             t["bg"] = data
         else:
             t["bg"] = self.boss[value]
+
+    def autoSetStamp(self, options, target, value):
+        if value is None: return
+        t = self.getOptionTarget(options, target)
+        if value in self.stamp:
+            t["asset"] = self.stamp[value]
 
     def autoSetBoss(self, options, target, value):
         if value == "": return
@@ -611,6 +665,45 @@ class GBFTMR():
                                     settings['boss'][1] = s
                                 else:
                                     settings['boss'][1] = settings['boss'][0]
+                case "stamp":
+                    while True:
+                        print("Input the stamp you want to use (Leave blank to ignore)")
+                        s = input().lower()
+                        if s == "":
+                            break
+                        else:
+                            if s in self.stamp:
+                                e["type"] = "asset"
+                                e['asset'] = self.stamp[s]
+                                break
+                            else:
+                                try:
+                                    if not s.startswith("http"):
+                                        raise Exception()
+                                    self.getAsset(s)
+                                    url = s
+                                    e["type"] = "asset"
+                                    e['asset'] = url
+                                    break
+                                except:
+                                    print("Not a valid URL or name")
+                                    r = self.search_stamp(s)
+                                    if len(r) > 0:
+                                        print("Did you mean...?")
+                                        print("*", "\n* ".join(r))
+                                    continue
+                                while True:
+                                    print("Input a stamp name to save those settings (Leave blank to ignore)")
+                                    s = input().lower()
+                                    if s == "": break
+                                    elif s in self.stamp:
+                                        print(s, "already exists, overwrite? ('y' to confirm)")
+                                        if input().lower() != 'y':
+                                            continue
+                                    self.stamp[s] = url
+                                    self.saveStamps()
+                                    break
+                                break
                 case "party":
                     if gbfpib is not None:
                         settings["gbfpib"] = gbfpib
@@ -1062,9 +1155,15 @@ class GBFTMR():
         return modified
 
     def search_boss(self, search):
+        return self._search(search, self.boss)
+
+    def search_stamp(self, search):
+        return self._search(search, self.stamp)
+
+    def _search(self, search, target):
         s = search.lower().split(" ")
         r = []
-        for k in self.boss:
+        for k in target:
             for i in s:
                 if i != "" and i in k:
                     r.append(k)
@@ -1078,6 +1177,7 @@ class GBFTMR():
             print("[0] Search Boss by keyword")
             print("[1] Preview Boss")
             print("[2] Delete Boss")
+            print("[3] Tutorial")
             print("[Any] Back")
             s = input()
             match s:
@@ -1114,6 +1214,60 @@ class GBFTMR():
                         self.boss.pop(s)
                         self.saveBosses()
                         print("Done")
+                    else:
+                        print("Not found")
+                        r = self.search_boss(s)
+                        if len(r) > 0:
+                            print("Listing bosses matching the keywords...")
+                            print("*", "\n* ".join(r))
+                case '3':
+                    print("# Explanation")
+                    print("Bosses make up the background of your thumbnail.")
+                    print("They are composed of three elements:")
+                    print("- A background (usually the background used in the raid).")
+                    print("- A boss ID. Said boss must have a \"raid_appear\" spritesheet.")
+                    print("- A boss ID used for the bottom left corner icon. It can be different from the spritesheet one (some bosses do share asset).")
+                    print("You can browser through https://mizagbf.github.io/GBFAL/ to look for a boss with a specific \"raid_appear\" spritesheet, or use the Chrome Dev Tools in-game.")
+                case _:
+                    break
+
+    def manageStamp(self):
+        while True:
+            print("")
+            print("Stamp Management Menu")
+            print("[0] Search Stamp by keyword")
+            print("[1] Register Stamp")
+            print("[2] Delete Stamp")
+            print("[3] Tutorial")
+            print("[Any] Back")
+            s = input()
+            match s:
+                case '0':
+                    print("Input keywords to search")
+                    r = self.search_stamp(input())
+                    if len(r) > 0:
+                        print("Listing stamps matching the keywords...")
+                        print("*", "\n* ".join(r))
+                    print(len(r), "positive result(s)")
+                case '1':
+                    self.addStamp()
+                case '2':
+                    print("Input the name of a Stamp to delete")
+                    s = input()
+                    if s in self.stamp:
+                        self.stamp.pop(s)
+                        self.saveStamps()
+                        print("Done")
+                    else:
+                        print("Not found")
+                        r = self.search_stamp(s)
+                        if len(r) > 0:
+                            print("Listing stamps matching the keywords...")
+                            print("*", "\n* ".join(r))
+                case '3':
+                    print("# Explanation")
+                    print("GBF Stamps or Stickers are added to thumbnail for flavor or comedy.")
+                    print("This menu lets you register them in advance.")
                 case _:
                     break
 
@@ -1124,7 +1278,8 @@ class GBFTMR():
             print("[0] Generate Thumbnail")
             print("[1] Add Boss Fight")
             print("[2] Manage Boss Fights")
-            print("[3] Get Boss Bookmark")
+            print("[3] Manage Stamps")
+            print("[4] Get Boss Bookmark")
             print("[Any] Quit")
             s = input()
             match s:
@@ -1135,6 +1290,8 @@ class GBFTMR():
                 case '2':
                     self.manageBoss()
                 case '3':
+                    self.manageStamp()
+                case '4':
                     pyperclip.copy("javascript:(function () { let copyListener = event => { document.removeEventListener(\"copy\", copyListener, true); event.preventDefault(); let clipboardData = event.clipboardData; clipboardData.clearData(); clipboardData.setData(\"text/plain\", \"$$boss:\"+(stage.pJsnData.is_boss != null ? stage.pJsnData.is_boss.split(\"_\").slice(2).join(\"_\") : stage.pJsnData.boss.param[0].cjs.split(\"_\")[1])+\"|\"+stage.pJsnData.background.split(\"/\")[4].split(\".\")[0]+\"|\"+stage.pJsnData.boss.param[0].cjs.split(\"_\")[1]); }; document.addEventListener(\"copy\", copyListener, true); document.execCommand(\"copy\"); })();")
                     print("Bookmark copied!")
                     print("Make a new bookmark and paste the code in the url field")

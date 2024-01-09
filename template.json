@@ -16,6 +16,12 @@
             "position":[200, -25]
         },
         {
+            "type":"stamp",
+            "size":1.4,
+            "anchor":"left",
+            "position":[20, -80]
+        },
+        {
             "type":"textinput",
             "ref":"Thumbnail Text",
             "anchor":"bottomright",
@@ -55,6 +61,12 @@
             "position":[200, -25]
         },
         {
+            "type":"stamp",
+            "size":1.4,
+            "anchor":"left",
+            "position":[20, -80]
+        },
+        {
             "type":"textinput",
             "ref":"Thumbnail Text",
             "anchor":"bottomright",
@@ -91,6 +103,12 @@
             "mainsummon":true
         },
         {
+            "type":"stamp",
+            "size":1.4,
+            "anchor":"left",
+            "position":[20, -120]
+        },
+        {
             "type":"textinput",
             "ref":"Thumbnail Text",
             "anchor":"bottomleft",
@@ -114,6 +132,12 @@
             "anchor":"top",
             "position":[50, 60],
             "noskin":true
+        },
+        {
+            "type":"stamp",
+            "size":1.4,
+            "anchor":"topleft",
+            "position":[20, 130]
         },
         {
             "type":"textinput",
@@ -157,6 +181,12 @@
             "size":3,
             "anchor":"bottomleft",
             "position":[200, -25]
+        },
+        {
+            "type":"stamp",
+            "size":1.4,
+            "anchor":"left",
+            "position":[20, -80]
         },
         {
             "type":"textinput",
