@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 23]
+        self.version = [1, 24]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -952,7 +952,7 @@ class GBFTMR():
                 characters.append(export['ss'][0])
             if not mainsummon:
                 if export['w'][0] is not None and export['wl'][0] is not None:
-                    characters.append(str(export['w'][0]) + "00")
+                    characters.append(str(export['w'][0]))
                 else:
                     characters.append("1999999999")
         except Exception as e:
