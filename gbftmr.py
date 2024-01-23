@@ -10,7 +10,7 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 24]
+        self.version = [1, 25]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -846,7 +846,7 @@ class GBFTMR():
         return modified
 
     def auto_asset(self, img, settings, element): # auto asset parsing
-        if element["asset"] is None: return img
+        if element.get("asset", None) is None: return img
         pos = element.get('anchor', 'topleft')
         offset = element.get('position', (0,0))
         ratio = element.get('size', 1.0)
