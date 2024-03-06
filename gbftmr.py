@@ -10,39 +10,13 @@ import copy
 
 class GBFTMR():
     def __init__(self, path=""):
-        self.version = [1, 25]
+        self.version = [1, 26]
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
         self.cache = {}
-        self.classes = { # class prefix (gotta add them manually, sadly)
-            10: 'sw',
-            11: 'sw',
-            12: 'wa',
-            13: 'wa',
-            14: 'kn',
-            15: 'sw',
-            16: 'me',
-            17: 'bw',
-            18: 'mc',
-            19: 'sp',
-            30: 'sw',
-            41: 'ax',
-            42: 'sp',
-            43: 'me',
-            44: 'bw',
-            45: 'sw',
-            20: 'kn',
-            21: 'kt',
-            22: 'kt',
-            23: 'sw',
-            24: 'gu',
-            25: 'wa',
-            26: 'kn',
-            27: 'mc',
-            28: 'kn',
-            29: 'gu'
-        }
+        self.classes = None
+        self.class_modified = False
         self.nullchar = [3030182000, 3020072000]
         self.regex = [
             re.compile('(30[0-9]{8})_01\\.'),
@@ -151,6 +125,22 @@ class GBFTMR():
         except:
             pass
 
+    def loadClasses(self) -> None:
+        try:
+            self.class_modified = False
+            with open(self.path+"classes.json", mode="r", encoding="utf-8") as f:
+                self.classes = json.load(f)
+        except:
+            self.classes = {}
+
+    def saveClasses(self) -> None:
+        try:
+            if self.class_modified:
+                with open(self.path+"classes.json", mode='w', encoding='utf-8') as outfile:
+                    json.dump(self.classes, outfile)
+        except:
+            pass
+
     def checkDiskCache(self): # check if cache folder exists (and create it if needed)
         if not os.path.isdir(self.path + 'cache'):
             os.mkdir(self.path + 'cache')
@@ -248,9 +238,19 @@ class GBFTMR():
             break
 
     def get_mc_job_look(self, skin, job): # get the MC unskined filename based on id
-        jid = job // 10000
-        if jid not in self.classes: return skin
-        return "{}_{}_{}".format(job, self.classes[jid], '_'.join(skin.split('_')[2:]))
+        sjob = str((job//100) * 100 + 1)
+        if sjob in self.classes:
+            return "{}_{}_{}".format(sjob, self.classes[sjob], '_'.join(skin.split('_')[2:]))
+        else:
+            for mh in ["sw", "kn", "sp", "ax", "wa", "gu", "me", "bw", "mc", "kr"]:
+                try:
+                    self.getAsset("https://prd-game-a5-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}_{}_0_01.jpg".format(job, mh))
+                    self.class_modified = True
+                    self.classes[sjob] = mh
+                    return "{}_{}_{}".format(sjob, self.classes[sjob], '_'.join(skin.split('_')[2:])) 
+                except:
+                    pass
+        return ""
 
     def check_id(self, id, recur=True): # check an element id and return it if valid (None if error)
         if id is None or not isinstance(id, str): return None
@@ -807,6 +807,8 @@ class GBFTMR():
         self.makeThumbnail(settings, template)
 
     def makeThumbnail(self, settings, template):
+        if self.classes is None:
+            self.loadClasses()
         print("[TMR] |--> Starting thumbnail generation...")
         img = self.make_canvas((1280, 720))
         for i, e in enumerate(template):
@@ -826,6 +828,7 @@ class GBFTMR():
         img.save("thumbnail.png", "PNG")
         img.close()
         print("[TMR] |--> thumbnail.png has been generated with success")
+        self.saveClasses()
 
     def auto_background(self, img, settings, element):
         if 'bg' not in settings: return img
