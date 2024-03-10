@@ -20,6 +20,7 @@ class GBFTMR():
         self.nullchar = [3030182000, 3020072000]
         self.regex = [
             re.compile('(30[0-9]{8})_01\\.'),
+            re.compile('(20[0-9]{8})_04\\.'),
             re.compile('(20[0-9]{8})_03\\.'),
             re.compile('(20[0-9]{8})_02\\.'),
             re.compile('(20[0-9]{8})\\.'),
