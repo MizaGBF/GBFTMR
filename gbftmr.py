@@ -9,8 +9,8 @@ import base64
 import copy
 
 class GBFTMR():
-    def __init__(self, path=""):
-        self.version = [1, 26]
+    version = [1, 27]
+    def __init__(self, path : str = "") -> None:
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
         self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
@@ -89,21 +89,25 @@ class GBFTMR():
         self.mask = tmp.convert('L')
         tmp.close()
 
-    def loadTemplates(self):
+    def loadTemplates(self) -> None:
         try:
             with open(self.path+"template.json", mode="r", encoding="utf-8") as f:
                 self.template = json.load(f)
         except Exception as e:
             print(e)
 
-    def loadBosses(self):
+    def loadBosses(self) -> None:
         try:
             with open(self.path+"boss.json", mode="r", encoding="utf-8") as f:
                 self.boss = json.load(f)
+            # patch
+            for s in self.boss:
+                if len(self.boss[s]) == 3:
+                    self.boss[s].append(False)
         except:
             pass
 
-    def saveBosses(self):
+    def saveBosses(self) -> None:
         try:
             with open(self.path+"boss.json", mode="w", encoding="utf-8") as f:
                 json.dump(self.boss, f, ensure_ascii=False)
@@ -111,14 +115,14 @@ class GBFTMR():
         except:
             pass
 
-    def loadStamps(self):
+    def loadStamps(self) -> None:
         try:
             with open(self.path+"stamp.json", mode="r", encoding="utf-8") as f:
                 self.stamp = json.load(f)
         except:
             pass
 
-    def saveStamps(self):
+    def saveStamps(self) -> None:
         try:
             with open(self.path+"stamp.json", mode="w", encoding="utf-8") as f:
                 json.dump(self.stamp, f, ensure_ascii=False)
@@ -142,22 +146,29 @@ class GBFTMR():
         except:
             pass
 
-    def checkDiskCache(self): # check if cache folder exists (and create it if needed)
+    def checkDiskCache(self) -> None: # check if cache folder exists (and create it if needed)
         if not os.path.isdir(self.path + 'cache'):
             os.mkdir(self.path + 'cache')
 
-    def getAsset(self, url):
+    def getAsset(self, url : str) -> bytes:
         response = self.client.get(url, headers={'connection':'keep-alive'})
         if response.status_code != 200: raise Exception()
         return response.content
 
-    def bookmarkString(self, s):
+    def bookmarkString(self, s : str) -> tuple:
         if s.startswith("$$boss:"):
-            return tuple(s.replace("$$boss:", "").split('|'))
+            s = s.replace("$$boss:", "").split('|')
+            if len(s) == 3: s.append(False)
+            elif len(s) >= 4:
+                if s[3] == "1" or s[3].lower() == "true": s[3] = True
+                else: s[3] = False
+                if len(s) >= 5:
+                    s = s[:4]
+            return tuple(s)
         else:
-            return None, None, None
+            return None, None, None, None
 
-    def addBoss(self):
+    def addBoss(self) -> None:
         print("Input an Enemy ID with a valid Appear animation (Leave blank to cancel)")
         s = input()
         if s == "": return
@@ -166,7 +177,7 @@ class GBFTMR():
                 s = pyperclip.paste()
             except:
                 s = "cc"
-        eid, bg, eico = self.bookmarkString(s)
+        eid, bg, eico, fix = self.bookmarkString(s)
         if eid is None:
             eid = s
             print("Input a background file name (Leave blank to skip)")
@@ -191,13 +202,15 @@ class GBFTMR():
             else:
                 eico = eid
         print("Generating a preview...")
-        img = self.generateBackground(eid, bg, eico)
+        img = self.generateBackground(eid, bg, eico, False if fix is None else fix)
         if img is None:
             print("An error occured, check if the ID you provided are correct")
             return
         else:
             img.show()
             img.close()
+        print("Input 'fix' if the name is wrong (Anything else to ignore)")
+        fix = (input().lower() == 'fix')
         while True:
             print("Input a boss name to save those settings (Leave blank to cancel)")
             s = input().lower()
@@ -206,11 +219,11 @@ class GBFTMR():
                 print(s, "already exists, overwrite? ('y' to confirm)")
                 if input().lower() != 'y':
                     continue
-            self.boss[s] = [eid, bg, eico]
+            self.boss[s] = [eid, bg, eico, fix]
             self.saveBosses()
             break
 
-    def addStamp(self):
+    def addStamp(self) -> None:
         while True:
             print("Input a stamp url (Leave blank to cancel)")
             s = input()
@@ -238,7 +251,7 @@ class GBFTMR():
             self.saveStamps()
             break
 
-    def get_mc_job_look(self, skin, job): # get the MC unskined filename based on id
+    def get_mc_job_look(self, skin, job) -> str: # get the MC unskined filename based on id
         sjob = str((job//100) * 100 + 1)
         if sjob in self.classes:
             return "{}_{}_{}".format(sjob, self.classes[sjob], '_'.join(skin.split('_')[2:]))
@@ -253,7 +266,7 @@ class GBFTMR():
                     pass
         return ""
 
-    def check_id(self, id, recur=True): # check an element id and return it if valid (None if error)
+    def check_id(self, id, recur : bool = True) -> str: # check an element id and return it if valid (None if error)
         if id is None or not isinstance(id, str): return None
         try:
             if len(id.replace('skin/', '').split('_')[0]) != 10: raise Exception("MC?")
@@ -277,16 +290,16 @@ class GBFTMR():
             id += '_' + input("Input uncap/modifier string:")
         return id
 
-    def get_uncap_id(self, cs): # to get character portraits based on uncap levels
+    def get_uncap_id(self, cs : int) -> str: # to get character portraits based on uncap levels
         return {2:'02', 3:'02', 4:'02', 5:'03', 6:'04'}.get(cs, '01')
 
-    def valid_name(self, s):
+    def valid_name(self, s : str) -> bool:
         for c in s:
             if c not in "abcdefghijklmnopqrstuvwxyz0123456789_":
                 return False
         return True
 
-    def generateBackground(self, eid, bg, eico):
+    def generateBackground(self, eid, bg, eico, fix : bool = None):
         try:
             if "_" in eid:
                 ext = "_"+eid.split("_")[1]
@@ -394,6 +407,8 @@ class GBFTMR():
                 appear = tmp
                 img = self.make_canvas((1280, 720))
                 for k in parts:
+                    if fix and k == "name_b":
+                        continue
                     crop = appear.crop(tuple(elements[k]))
                     match k:
                         case 'boss'|'opq_boss':
@@ -486,6 +501,7 @@ class GBFTMR():
                 case "boss":
                     options["choices"].append(["Boss ID", None, None, "settings", self.autoSetBoss])
                     options["choices"].append(["Boss Icon", None, None, "settings", self.autoSetBossIcon])
+                    options["choices"].append(["Boss Name Fix", ["No", "Yes"], ["no", "yes"], "settings", self.autoSetBossFix])
                 case "stamp":
                     options["choices"].append(["Stamp", ["None"]+list(self.stamp.keys()), [None]+list(self.stamp.keys()), "template-"+str(i), self.autoSetStamp])
                     e["type"] = "asset"
@@ -540,12 +556,12 @@ class GBFTMR():
         if value == "": return
         t = self.getOptionTarget(options, target)
         data = self.bookmarkString(value)
-        if data[0]is not None:
-            t["boss"] = [data[0], data[2]]
+        if data[0] is not None:
+            t["boss"] = [data[0], data[2], data[3]]
         elif not value.isdigit() and value in self.boss:
-            t["boss"] = [self.boss[value][0], self.boss[value][2]]
+            t["boss"] = [self.boss[value][0], self.boss[value][2], False]
         else:
-            t["boss"] = [value, None]
+            t["boss"] = [value, None, False]
 
     def autoSetBossIcon(self, options, target, value):
         t = self.getOptionTarget(options, target)
@@ -554,6 +570,11 @@ class GBFTMR():
             t["boss"][1] = t["boss"][0]
         else:
             t["boss"][1] = value
+
+    def autoSetBossFix(self, options, target, value):
+        t = self.getOptionTarget(options, target)
+        if "boss" not in t: return
+        t["boss"][2] = (value == "yes")
 
     def autoSetAsset(self, options, target, value):
         t = self.getOptionTarget(options, target)
@@ -642,7 +663,7 @@ class GBFTMR():
                     if s != "":
                         data = self.bookmarkString(s)
                         if data[0] is not None:
-                            settings['boss'] = [data[0], data[2]]
+                            settings['boss'] = [data[0], data[2], data[3]]
                             while True:
                                 print("Input a boss name to save those settings (Leave blank to ignore)")
                                 s = input().lower()
@@ -656,9 +677,9 @@ class GBFTMR():
                                 break
                         else:
                             if not s.isdigit() and s in self.boss:
-                                settings['boss'] = [self.boss[s][0], self.boss[s][2]]
+                                settings['boss'] = [self.boss[s][0], self.boss[s][2], self.boss[s][3]]
                             else:
-                                settings['boss'] = [s, None]
+                                settings['boss'] = [s, None, False]
                             if settings['boss'][1] is None:
                                 print("Input the ID of the boss whose icon you want to display, if different (Leave blank to ignore)")
                                 s = input().lower()
@@ -833,7 +854,7 @@ class GBFTMR():
 
     def auto_background(self, img, settings, element):
         if 'bg' not in settings: return img
-        bg = self.generateBackground(settings['bg'][0], settings['bg'][1], settings['bg'][2])
+        bg = self.generateBackground(settings['bg'][0], settings['bg'][1], settings['bg'][2], settings['bg'][3])
         if bg is None: return img
         modified = Image.alpha_composite(img, bg)
         img.close()
@@ -842,7 +863,7 @@ class GBFTMR():
 
     def auto_boss(self, img, settings, element):
         if 'boss' not in settings: return img
-        bg = self.generateBackground(settings['boss'][0], None, settings['boss'][1])
+        bg = self.generateBackground(settings['boss'][0], None, settings['boss'][1], settings['boss'][2])
         if bg is None: return img
         modified = Image.alpha_composite(img, bg)
         img.close()
@@ -1181,7 +1202,8 @@ class GBFTMR():
             print("[0] Search Boss by keyword")
             print("[1] Preview Boss")
             print("[2] Delete Boss")
-            print("[3] Tutorial")
+            print("[3] Toggle Boss Name fix")
+            print("[4] Tutorial")
             print("[Any] Back")
             s = input()
             match s:
@@ -1225,12 +1247,35 @@ class GBFTMR():
                             print("Listing bosses matching the keywords...")
                             print("*", "\n* ".join(r))
                 case '3':
+                    print("Input the name of a Boss Fight to toggle the Name Fix")
+                    s = input()
+                    if s in self.boss:
+                        self.boss[s][3] = not self.boss[s][3]
+                        print("Fix is", ("enabled" if self.boss[s][3] else "disabled"), "for", s)
+                        self.saveBosses()
+                        print("Generating preview...")
+                        img = self.generateBackground(*(self.boss[s]))
+                        if img is None:
+                            print("An error occured, aborting...")
+                        else:
+                            print("Opening preview...")
+                            img.show()
+                            img.close()
+                        print("Done")
+                    else:
+                        print("Not found")
+                        r = self.search_boss(s)
+                        if len(r) > 0:
+                            print("Listing bosses matching the keywords...")
+                            print("*", "\n* ".join(r))
+                case '4':
                     print("# Explanation")
                     print("Bosses make up the background of your thumbnail.")
                     print("They are composed of three elements:")
                     print("- A background (usually the background used in the raid).")
                     print("- A boss ID. Said boss must have a \"raid_appear\" spritesheet.")
                     print("- A boss ID used for the bottom left corner icon. It can be different from the spritesheet one (some bosses do share asset).")
+                    print("- Fixing a boss name is a workaround implemented for some bosses, where the boss name will be bugged.")
                     print("You can browser through https://mizagbf.github.io/GBFAL/ to look for a boss with a specific \"raid_appear\" spritesheet, or use the Chrome Dev Tools in-game.")
                 case _:
                     break
