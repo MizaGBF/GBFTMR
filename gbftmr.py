@@ -8,7 +8,7 @@ import base64
 import copy
 
 class GBFTMR():
-    version = [1, 29]
+    version = [1, 30]
     def __init__(self, path : str = "") -> None:
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
@@ -558,7 +558,6 @@ class GBFTMR():
         else:
             if value < 0: # record
                 t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/common/terra/top/assets/quest/terra{}_hell{}.png".format(t["gwn"].zfill(3), -value)
-                options['template'].append({"type":"asset", "asset":"record of the ten.png", "anchor":"topleft", "position":[-40, 0]})
             elif value < 10: # db fight
                 t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img_low/sp/assets/summon/qm/teamforce{}_star{}.png".format(t["gwn"].zfill(2), value)
             elif value < 20: # db nm
@@ -772,7 +771,6 @@ class GBFTMR():
                         gwn = input()
                         if nm < 0: # record
                             e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/common/terra/top/assets/quest/terra{}_hell{}.png".format(gwn.zfill(3), -nm)
-                            template.append({"type":"asset", "asset":"record of the ten.png", "anchor":"topleft", "position":[-40, 0]})
                         elif nm < 10:
                             e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_star{}.png".format(gwn.zfill(2), nm)
                         elif nm < 20:
