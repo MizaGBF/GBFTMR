@@ -78,7 +78,7 @@
             "ljust": 14
         }
     ],
-    "Record of the Ten": [
+    "Records of the Ten": [
         {
             "type":"background"
         },
@@ -120,7 +120,7 @@
         },
         {
             "type":"asset",
-            "asset":"record of the ten.png",
+            "asset":"records of the ten.png",
             "anchor":"topleft",
             "position":[-40, 0]
         }
