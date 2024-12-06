@@ -17,7 +17,7 @@ Possible types are:
 * `boss`: Similar to `background` but only generate the boss (No background image).  
 * `party`: Check the clipboard for GBFPIB data to draw the party.  
 * `autoinput`: Force the Auto Setting selection prompt.  
-* `nminput`: Force the Unite and Fight / Dread Barrage / Record of the time Fight/Nightmare icon selection prompt. Note: Record of the Ten fights automatically add the event icon on the top left.  
+* `nminput`: Force the Unite and Fight / Dread Barrage / Record of the time Fight/Nightmare icon selection prompt.  
 * `textinput`: Force the Text input prompt.  
 * `asset`: To display an asset. Filename must be set under the `asset` key.  
   
