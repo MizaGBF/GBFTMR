@@ -1,5 +1,4 @@
 import json
-import re
 import httpx
 from PIL import Image, ImageFont, ImageDraw
 from io import BytesIO
@@ -9,7 +8,7 @@ import base64
 import copy
 
 class GBFTMR():
-    version = [1, 28]
+    version = [1, 29]
     def __init__(self, path : str = "") -> None:
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
         self.path = path
@@ -18,14 +17,6 @@ class GBFTMR():
         self.classes = None
         self.class_modified = False
         self.nullchar = [3030182000, 3020072000]
-        self.regex = [
-            re.compile('(30[0-9]{8})_01\\.'),
-            re.compile('(20[0-9]{8})_04\\.'),
-            re.compile('(20[0-9]{8})_03\\.'),
-            re.compile('(20[0-9]{8})_02\\.'),
-            re.compile('(20[0-9]{8})\\.'),
-            re.compile('(10[0-9]{8})\\.')
-        ]
         self.asset_urls = [
             [
                 "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}.jpg",
@@ -266,30 +257,6 @@ class GBFTMR():
                     pass
         return ""
 
-    def check_id(self, id, recur : bool = True) -> str: # check an element id and return it if valid (None if error)
-        if id is None or not isinstance(id, str): return None
-        try:
-            if len(id.replace('skin/', '').split('_')[0]) != 10: raise Exception("MC?")
-            int(id.replace('skin/', '').split('_')[0])
-            t = int(id.replace('skin/', '')[0])
-        except Exception as e:
-            if str(e) == "MC?":
-                t = 0
-                if len(id.split("_")) != 4:
-                    try:
-                        id = self.get_mc_job_look(None, id)
-                    except:
-                        if recur: return self.check_id(self.search_id_on_wiki(id), recur=False) # wiki check
-                        else: return None
-            else:
-                if recur: return self.check_id(self.search_id_on_wiki(id), recur=False) # wiki check
-                else: return None
-        if id is None:
-            return None
-        if t > 1 and '_' not in id:
-            id += '_' + input("Input uncap/modifier string:")
-        return id
-
     def get_uncap_id(self, cs : int) -> str: # to get character portraits based on uncap levels
         return {2:'02', 3:'02', 4:'02', 5:'03', 6:'04'}.get(cs, '01')
 
@@ -509,8 +476,8 @@ class GBFTMR():
                     options["choices"].append(["Auto Setting", ["Manual", "Auto", "Full Auto", "Full Auto Guard"], [None, "auto.png", "fa.png", "fa_guard.png"], "template-"+str(i), self.autoSetAsset])
                     e["type"] = "asset"
                 case "nminput":
-                    options["choices"].append(["GW or DB ID", None, None, "template-"+str(i), self.autoSetGW])
-                    options["choices"].append(["NM Setting", ["None", "GW NM90", "GW NM95", "GW NM100", "GW NM150", "GW NM200", "GW NM250", "DB 1*", "DB 2*", "DB 3*", "DB 4*", "DB 5*", "DB UF95", "DB UF135", "DB UF175", "DB Valiant"], [None, 90, 95, 100, 150, 200, 250, 1, 2, 3, 4, 5, 11, 12, 13, 20], "template-"+str(i), self.autoSetNM])
+                    options["choices"].append(["GW/DB/Record ID", None, None, "template-"+str(i), self.autoSetGW])
+                    options["choices"].append(["NM Setting", ["None", "GW NM90", "GW NM95", "GW NM100", "GW NM150", "GW NM200", "GW NM250", "DB 1*", "DB 2*", "DB 3*", "DB 4*", "DB 5*", "DB UF95", "DB UF135", "DB UF175", "DB Valiant", "Record NM100", "Record NM150"], [None, 90, 95, 100, 150, 200, 250, 1, 2, 3, 4, 5, 11, 12, 13, 20, -100, -150], "template-"+str(i), self.autoSetNM])
                     e["type"] = "asset"
                 case "prideinput":
                     options["choices"].append(["Pride ID", ["Gilbert", "Nalhe Great Wall", "Violet Knight", "Echidna", "Golden Knight", "White Knight", "Cherub", "Kikuri", "Zwei", "Maxwell", "??? (12)", "??? (12)"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "template-"+str(i), self.autoSetPrideID])
@@ -589,13 +556,16 @@ class GBFTMR():
         if value is None:
             t["asset"] = value
         else:
-            if value < 10:
+            if value < 0: # record
+                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/common/terra/top/assets/quest/terra{}_hell{}.png".format(t["gwn"].zfill(3), -value)
+                options['template'].append({"type":"asset", "asset":"record of the ten.png", "anchor":"topleft", "position":[-40, 0]})
+            elif value < 10: # db fight
                 t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img_low/sp/assets/summon/qm/teamforce{}_star{}.png".format(t["gwn"].zfill(2), value)
-            elif value < 20:
+            elif value < 20: # db nm
                 t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_strong{}.png".format(t["gwn"].zfill(2), int(value)-10)
-            elif value == 20:
+            elif value == 20: # db valiant
                 t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_sp.png".format(t["gwn"].zfill(2))
-            else:
+            else: # gw
                 t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(t["gwn"].zfill(3), t["gwn"].zfill(3), value)
 
     def autoSetPrideID(self, options, target, value):
@@ -623,7 +593,8 @@ class GBFTMR():
         except: return
         settings = {}
         template = copy.deepcopy(self.template[k])
-        for e in template:
+        for index in range(len(template)):
+            e = template[index]
             match e["type"]:
                 case "background":
                     while True:
@@ -774,6 +745,8 @@ class GBFTMR():
                     print("[12] DB UF135")
                     print("[13] DB UF175")
                     print("[14] DB Valiant")
+                    print("[15] Record NM100")
+                    print("[16] Record NM150")
                     print("[Any] Skip")
                     match input():
                         case "0": nm = 90
@@ -791,11 +764,16 @@ class GBFTMR():
                         case "12": nm = 12
                         case "13": nm = 13
                         case "14": nm = 20
+                        case "15": nm = -100
+                        case "16": nm = -150
                         case _: nm = None
                     if nm is not None:
-                        print("Input a GW or DB ID:")
+                        print("Input a GW / DB / Record ID:")
                         gwn = input()
-                        if nm < 10:
+                        if nm < 0: # record
+                            e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/common/terra/top/assets/quest/terra{}_hell{}.png".format(gwn.zfill(3), -nm)
+                            template.append({"type":"asset", "asset":"record of the ten.png", "anchor":"topleft", "position":[-40, 0]})
+                        elif nm < 10:
                             e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_star{}.png".format(gwn.zfill(2), nm)
                         elif nm < 20:
                             e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_strong{}.png".format(gwn.zfill(2), nm-10)

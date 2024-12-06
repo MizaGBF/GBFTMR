@@ -31,7 +31,7 @@
             "ljust": 14
         }
     ],
-    "GW / Dread": [
+    "GW / Dread / Record": [
         {
             "type":"asset",
             "asset":"dread barrage.png",
