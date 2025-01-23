@@ -124,7 +124,7 @@ class GBFTMR():
     def __init__(self : GBFTMR, path : str = "", client : None|aiohttp.ClientSession = None) -> None:
         self.path = path # working directory path
         self.client = client # aiohttp client
-        if path is not None and self.client is None:
+        if path != "" and self.client is None:
             raise Exception("A valid ClientSession is expected when the working directory path is specified")
         print("GBF Thumbnail Maker Remake v{}.{}".format(self.VERSION[0], self.VERSION[1]))
         self.cache = {} # asset memory cache
