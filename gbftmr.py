@@ -118,9 +118,11 @@ class GBFTMR():
     NULLCHARACTER = [3030182000, 3020072000]
     DISPLAY_TABLE = ["squareicon", "partyicon", "fullart", "homeart", "skycompass"]
     def __init__(self : GBFTMR, path : str = "", client : None|aiohttp.ClientSession = None) -> None:
-        print("GBF Thumbnail Maker Remake v{}.{}".format(self.VERSION[0], self.VERSION[1]))
         self.path = path
         self.client = client
+        if path is not None and self.client is None:
+            raise Exception("A valid ClientSession is expected when the working directory path is specified")
+        print("GBF Thumbnail Maker Remake v{}.{}".format(self.VERSION[0], self.VERSION[1]))
         self.cache = {}
         self.classes = None
         self.class_modified = False
