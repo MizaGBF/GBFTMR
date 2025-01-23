@@ -1,10 +1,10 @@
 # Granblue Fantasy Thumbnail Maker Remake  
 * Tool to generate thumbnails for Granblue Fantasy videos.  
 ### Requirements  
-* Tested on Python 3.11 and higher.  
+* Tested on Python 3.13 and higher.  
 * [pyperclip](https://pypi.org/project/pyperclip/) to read/write the clipboard.  
 * [Pillow](https://pillow.readthedocs.io/en/stable/) for image processing.  
-* [httpx](hhttps://github.com/encode/httpx) for network requests.  
+* [aiohttp](https://docs.aiohttp.org/en/stable/) for network requests.  
 * `pip install -r requirements.txt` to install all the modules.  
 ### Notes  
 * This project is a rework of [GBFTM](https://github.com/MizaGBF/GBFTM).  

@@ -1,75 +1,129 @@
+from __future__ import annotations
 import json
-import httpx
+import asyncio
+import aiohttp
+from dataclasses import dataclass
 from PIL import Image, ImageFont, ImageDraw
 from io import BytesIO
+import traceback
 import pyperclip
 import os
 import base64
 import copy
 
+# class to manipulate vector2
+dataclass(slots=True)
+class v2():
+    x : int|float = 0
+    y : int|float = 0
+    
+    def __init__(self : v2, X : int|float, Y : int|float):
+        self.x = X
+        self.y = Y
+    
+    def __add__(self : v2, other : v2|tuple|list|int|float) -> v2:
+        if isinstance(other, float) or isinstance(other, int):
+            return v2(self.x + other, self.y + other)
+        else:
+            return v2(self.x + other[0], self.y + other[1])
+    
+    def __radd__(self : v2, other : v2|tuple|list|int|float) -> v2:
+        return self.__add__(other)
+
+    def __mul__(self : v2, other : v2|tuple|list|int|float) -> v2:
+        if isinstance(other, float) or isinstance(other, int):
+            return v2(self.x * other, self.y * other)
+        else:
+            return v2(self.x * other[0], self.y * other[1])
+
+    def __rmul__(self : v2, other : v2|tuple|list|int|float) -> v2:
+        return self.__mul__(other)
+
+    def __getitem__(self : v2, key : int) -> int|float:
+        if key == 0:
+            return self.x
+        elif key == 1:
+            return self.y
+        else:
+            raise IndexError("Index out of range")
+
+    def __setitem__(self : v2, key : int, value : int|float) -> None:
+        if key == 0:
+            self.x = value
+        elif key == 1:
+            self.y = value
+        else:
+            raise IndexError("Index out of range")
+
+    def __len__(self : v2) -> int:
+        return 2
+
+    @property
+    def i(self : v2) -> tuple[int, int]:
+        return (int(self.x), int(self.y))
+
 class GBFTMR():
-    version = [1, 30]
-    def __init__(self, path : str = "") -> None:
-        print("GBF Thumbnail Maker Remake v{}.{}".format(self.version[0], self.version[1]))
+    VERSION = (2, 0)
+    ASSET_TABLE = [
+        [
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}.jpg",
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/quest/{}.jpg",
+            "http://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/my/{}.png",
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/job_change/{}.png",
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/job_change/{}.png"
+        ],
+        [
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/s/{}.jpg",
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/m/{}.jpg",
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/b/{}.png",
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/b/{}.png",
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/b/{}.png"
+        ],
+        [
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/s/{}.jpg",
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/m/{}.jpg",
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/my/{}.png",
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/b/{}.png",
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/b/{}.png"
+        ],
+        [
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/s/{}.jpg",
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/quest/{}.jpg",
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/my/{}.png",
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img_low/sp/assets/npc/b/{}.png",
+            "https://media.skycompass.io/assets/customizes/characters/1138x1138/{}.png"
+        ],
+        [
+            "assets/{}",
+            "assets/{}",
+            "assets/{}",
+            "assets/{}",
+            "assets/{}"
+        ],
+        [
+            "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/s/{}.jpg",
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/deckcombination/base_empty_weapon_sub.png",
+            "",
+            "",
+            ""
+        ],
+        [
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/s/{}.jpg",
+            "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/deckcombination/base_empty_npc.jpg",
+            "",
+            "",
+            ""
+        ]
+    ]
+    NULLCHARACTER = [3030182000, 3020072000]
+    DISPLAY_TABLE = ["squareicon", "partyicon", "fullart", "homeart", "skycompass"]
+    def __init__(self : GBFTMR, path : str = "", client : None|aiohttp.ClientSession = None) -> None:
+        print("GBF Thumbnail Maker Remake v{}.{}".format(self.VERSION[0], self.VERSION[1]))
         self.path = path
-        self.client = httpx.Client(http2=False, limits=httpx.Limits(max_keepalive_connections=50, max_connections=50, keepalive_expiry=10))
+        self.client = client
         self.cache = {}
         self.classes = None
         self.class_modified = False
-        self.nullchar = [3030182000, 3020072000]
-        self.asset_urls = [
-            [
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}.jpg",
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/quest/{}.jpg",
-                "ttp://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/my/{}.png",
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/job_change/{}.png",
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/job_change/{}.png"
-            ],
-            [
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/s/{}.jpg",
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/m/{}.jpg",
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/b/{}.png",
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/b/{}.png",
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/b/{}.png"
-            ],
-            [
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/s/{}.jpg",
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/m/{}.jpg",
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/my/{}.png",
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/b/{}.png",
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/b/{}.png"
-            ],
-            [
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/s/{}.jpg",
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/quest/{}.jpg",
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/my/{}.png",
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img_low/sp/assets/npc/b/{}.png",
-                "https://media.skycompass.io/assets/customizes/characters/1138x1138/{}.png"
-            ],
-            [
-                "assets/{}",
-                "assets/{}",
-                "assets/{}",
-                "assets/{}",
-                "assets/{}"
-            ],
-            [
-                "https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/weapon/s/{}.jpg",
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/deckcombination/base_empty_weapon_sub.png",
-                "",
-                "",
-                ""
-            ],
-            [
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/npc/s/{}.jpg",
-                "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/deckcombination/base_empty_npc.jpg",
-                "",
-                "",
-                ""
-            ]
-        ]
-        self.possible_pos = ["topleft", "left", "bottomleft", "bottom", "bottomright", "right", "topright", "top", "middle"]
-        self.possible_display = ["squareicon", "partyicon", "fullart", "homeart", "skycompass"]
         self.boss = {}
         self.stamp = {}
         self.loadBosses()
@@ -80,14 +134,17 @@ class GBFTMR():
         self.mask = tmp.convert('L')
         tmp.close()
 
-    def loadTemplates(self) -> None:
+    def pexc(self : GBFTMR, e : Exception) -> str:
+        return "".join(traceback.format_exception(type(e), e, e.__traceback__))
+
+    def loadTemplates(self : GBFTMR) -> None:
         try:
             with open(self.path+"template.json", mode="r", encoding="utf-8") as f:
                 self.template = json.load(f)
         except Exception as e:
-            print(e)
+            print(self.pexc(e))
 
-    def loadBosses(self) -> None:
+    def loadBosses(self : GBFTMR) -> None:
         try:
             with open(self.path+"boss.json", mode="r", encoding="utf-8") as f:
                 self.boss = json.load(f)
@@ -98,7 +155,7 @@ class GBFTMR():
         except:
             pass
 
-    def saveBosses(self) -> None:
+    def saveBosses(self : GBFTMR) -> None:
         try:
             with open(self.path+"boss.json", mode="w", encoding="utf-8") as f:
                 json.dump(self.boss, f, ensure_ascii=False)
@@ -106,14 +163,14 @@ class GBFTMR():
         except:
             pass
 
-    def loadStamps(self) -> None:
+    def loadStamps(self : GBFTMR) -> None:
         try:
             with open(self.path+"stamp.json", mode="r", encoding="utf-8") as f:
                 self.stamp = json.load(f)
         except:
             pass
 
-    def saveStamps(self) -> None:
+    def saveStamps(self : GBFTMR) -> None:
         try:
             with open(self.path+"stamp.json", mode="w", encoding="utf-8") as f:
                 json.dump(self.stamp, f, ensure_ascii=False)
@@ -121,7 +178,7 @@ class GBFTMR():
         except:
             pass
 
-    def loadClasses(self) -> None:
+    def loadClasses(self : GBFTMR) -> None:
         try:
             self.class_modified = False
             with open(self.path+"classes.json", mode="r", encoding="utf-8") as f:
@@ -129,7 +186,7 @@ class GBFTMR():
         except:
             self.classes = {}
 
-    def saveClasses(self) -> None:
+    def saveClasses(self : GBFTMR) -> None:
         try:
             if self.class_modified:
                 with open(self.path+"classes.json", mode='w', encoding='utf-8') as outfile:
@@ -137,29 +194,33 @@ class GBFTMR():
         except:
             pass
 
-    def checkDiskCache(self) -> None: # check if cache folder exists (and create it if needed)
+    def checkDiskCache(self : GBFTMR) -> None: # check if cache folder exists (and create it if needed)
         if not os.path.isdir(self.path + 'cache'):
             os.mkdir(self.path + 'cache')
 
-    def getAsset(self, url : str) -> bytes:
-        response = self.client.get(url, headers={'connection':'keep-alive'})
-        if response.status_code != 200: raise Exception()
-        return response.content
+    async def getAsset(self : GBFTMR, url : str) -> bytes:
+        response = await self.client.get(url, headers={'connection':'keep-alive'})
+        if response.status != 200:
+            raise Exception()
+        return await response.read()
 
-    def bookmarkString(self, s : str) -> tuple:
+    def bookmarkString(self : GBFTMR, s : str) -> tuple[str|None, str|None, str|None, str|None]:
         if s.startswith("$$boss:"):
             s = s.replace("$$boss:", "").split('|')
-            if len(s) == 3: s.append(False)
+            if len(s) == 3:
+                s.append(False)
             elif len(s) >= 4:
-                if s[3] == "1" or s[3].lower() == "true": s[3] = True
-                else: s[3] = False
+                if s[3] == "1" or s[3].lower() == "true":
+                    s[3] = True
+                else:
+                    s[3] = False
                 if len(s) >= 5:
                     s = s[:4]
             return tuple(s)
         else:
             return None, None, None, None
 
-    def addBoss(self) -> None:
+    async def addBoss(self : GBFTMR) -> None:
         print("Input an Enemy ID with a valid Appear animation (Leave blank to cancel)")
         s = input()
         if s == "": return
@@ -193,7 +254,7 @@ class GBFTMR():
             else:
                 eico = eid
         print("Generating a preview...")
-        img = self.generateBackground(eid, bg, eico, False if fix is None else fix)
+        img = await self.generateBackground(eid, bg, eico, False if fix is None else fix)
         if img is None:
             print("An error occured, check if the ID you provided are correct")
             return
@@ -214,7 +275,7 @@ class GBFTMR():
             self.saveBosses()
             break
 
-    def addStamp(self) -> None:
+    async def addStamp(self : GBFTMR) -> None:
         while True:
             print("Input a stamp url (Leave blank to cancel)")
             s = input()
@@ -225,7 +286,7 @@ class GBFTMR():
                 except:
                     s = "cc"
             try:
-                self.getAsset(s)
+                await self.getAsset(s)
                 url = s
                 break
             except:
@@ -242,14 +303,14 @@ class GBFTMR():
             self.saveStamps()
             break
 
-    def get_mc_job_look(self, skin, job) -> str: # get the MC unskined filename based on id
+    async def get_mc_job_look(self : GBFTMR, skin, job) -> str: # get the MC unskined filename based on id
         sjob = str((job//100) * 100 + 1)
         if sjob in self.classes:
             return "{}_{}_{}".format(sjob, self.classes[sjob], '_'.join(skin.split('_')[2:]))
         else:
             for mh in ["sw", "kn", "sp", "ax", "wa", "gu", "me", "bw", "mc", "kr"]:
                 try:
-                    self.getAsset("https://prd-game-a5-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}_{}_0_01.jpg".format(job, mh))
+                    await self.getAsset("https://prd-game-a5-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}_{}_0_01.jpg".format(job, mh))
                     self.class_modified = True
                     self.classes[sjob] = mh
                     return "{}_{}_{}".format(sjob, self.classes[sjob], '_'.join(skin.split('_')[2:])) 
@@ -257,23 +318,23 @@ class GBFTMR():
                     pass
         return ""
 
-    def get_uncap_id(self, cs : int) -> str: # to get character portraits based on uncap levels
+    def get_uncap_id(self : GBFTMR, cs : int) -> str: # to get character portraits based on uncap levels
         return {2:'02', 3:'02', 4:'02', 5:'03', 6:'04'}.get(cs, '01')
 
-    def valid_name(self, s : str) -> bool:
+    def valid_name(self : GBFTMR, s : str) -> bool:
         for c in s:
             if c not in "abcdefghijklmnopqrstuvwxyz0123456789_":
                 return False
         return True
 
-    def generateBackground(self, eid, bg, eico, fix : bool = None):
+    async def generateBackground(self : GBFTMR, eid, bg, eico, fix : bool = None) -> Image|None:
         try:
             if "_" in eid:
                 ext = "_"+eid.split("_")[1]
                 eid = eid.split("_")[0]
             else:
                 ext = ""
-            cjs = self.getAsset("https://prd-game-a3-granbluefantasy.akamaized.net/assets_en/js/cjs/raid_appear_{}{}.js".format(eid, ext)).decode('utf-8')
+            cjs = (await self.getAsset("https://prd-game-a3-granbluefantasy.akamaized.net/assets_en/js/cjs/raid_appear_{}{}.js".format(eid, ext))).decode('utf-8')
             token = "raid_appear_"+eid+ext+"_"
             pos = 0
             elements = {}
@@ -300,7 +361,7 @@ class GBFTMR():
                 elements[name][2] += elements[name][0]
                 elements[name][3] += elements[name][1]
             if bg is not None:
-                with BytesIO(self.getAsset("https://game.granbluefantasy.jp/assets_en/img/sp/raid/bg/{}.jpg".format(bg))) as img_data:
+                with BytesIO(await self.getAsset("https://game.granbluefantasy.jp/assets_en/img/sp/raid/bg/{}.jpg".format(bg))) as img_data:
                     img = Image.open(img_data)
                     mod = 1280/img.size[0]
                     tmp = img.resize((int(img.size[0]*mod), int(img.size[0]*mod)), Image.Resampling.LANCZOS)
@@ -367,7 +428,7 @@ class GBFTMR():
             if 'jp' in elements: parts.append('jp')
             if 'en' in elements: parts.append('en')
 
-            with BytesIO(self.getAsset("https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/cjs/raid_appear_{}{}.png".format(eid, ext))) as img_data:
+            with BytesIO(await self.getAsset("https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/cjs/raid_appear_{}{}.png".format(eid, ext))) as img_data:
                 appear = Image.open(img_data)
                 tmp = appear.convert('RGBA')
                 appear.close()
@@ -423,7 +484,7 @@ class GBFTMR():
                     img = tmp
             try:
                 if eico is not None:
-                    with BytesIO(self.getAsset("https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/enemy/m/{}.png".format(eico))) as img_data:
+                    with BytesIO(await self.getAsset("https://prd-game-a-granbluefantasy.akamaized.net/assets_en/img/sp/assets/enemy/m/{}.png".format(eico))) as img_data:
                         mod = Image.open(img_data)
                         tmp = mod.convert("RGBA")
                         mod.close()
@@ -435,31 +496,26 @@ class GBFTMR():
                         layer.close()
                         img = tmp
             except Exception as e:
-                print(e)
+                print(self.pexc(e))
             return img
         except Exception as me:
-            print(me)
+            print(self.pexc(me))
             return None
 
-    def make_canvas(self, size): # make a blank image to the specified size
+    def make_canvas(self : GBFTMR, size) -> Image: # make a blank image to the specified size
         i = Image.new('RGB', size, "black")
         im_a = Image.new("L", i.size, "black")
         i.putalpha(im_a)
         im_a.close()
         return i
 
-    def addTuple(self, A:tuple, B:tuple): # to add pairs together
-        return (A[0]+B[0], A[1]+B[1])
-
-    def mulTuple(self, A:tuple, f:float): # multiply a pair by a value
-        return (int(A[0]*f), int(A[1]*f))
-
     # GBFPIB compatibility
-    def getTemplateList(self):
+    def getTemplateList(self : GBFTMR) -> list[str]:
         return list(self.template.keys())
 
-    def getThumbnailOptions(self, k):
-        if k not in self.template: return None
+    def getThumbnailOptions(self : GBFTMR, k : str) -> None|dict:
+        if k not in self.template:
+            return None
         options = {"template":copy.deepcopy(self.template[k]), "settings":{}, "choices":[]}
         for i, e in enumerate(options["template"]):
             match e["type"]:
@@ -487,9 +543,10 @@ class GBFTMR():
                     options["choices"].append([e["ref"], None, None, "choices-"+str(len(options["choices"])), self.autoSetText])
         return options
 
-    def getOptionTarget(self, options, target):
+    def getOptionTarget(self : GBFTMR, options : dict, target : str) -> str:
         match target:
-            case "settings": return options["settings"]
+            case "settings":
+                return options["settings"]
             case _:
                 if target.startswith('choices'):
                     el = target.split('-')
@@ -500,12 +557,13 @@ class GBFTMR():
                     el[1] = int(el[1])
                     return options["template"][el[1]]
 
-    def autoSetText(self, options, target, value):
+    def autoSetText(self : GBFTMR, options : dict, target : str, value : str) -> None:
         t = self.getOptionTarget(options, target)
         options["settings"][t[0]] = value
 
-    def autoSetBG(self, options, target, value):
-        if value is None: return
+    def autoSetBG(self : GBFTMR, options : dict, target : str, value : str) -> None:
+        if value is None:
+            return
         t = self.getOptionTarget(options, target)
         data = self.bookmarkString(value)
         if data[0]is not None:
@@ -513,14 +571,16 @@ class GBFTMR():
         else:
             t["bg"] = self.boss[value]
 
-    def autoSetStamp(self, options, target, value):
-        if value is None: return
+    def autoSetStamp(self : GBFTMR, options : dict, target : str, value : str) -> None:
+        if value is None:
+            return
         t = self.getOptionTarget(options, target)
         if value in self.stamp:
             t["asset"] = self.stamp[value]
 
-    def autoSetBoss(self, options, target, value):
-        if value == "": return
+    def autoSetBoss(self : GBFTMR, options : dict, target : str, value : str) -> None:
+        if value == "":
+            return
         t = self.getOptionTarget(options, target)
         data = self.bookmarkString(value)
         if data[0] is not None:
@@ -530,28 +590,30 @@ class GBFTMR():
         else:
             t["boss"] = [value, None, False]
 
-    def autoSetBossIcon(self, options, target, value):
+    def autoSetBossIcon(self : GBFTMR, options : dict, target : str, value : str) -> None:
         t = self.getOptionTarget(options, target)
-        if "boss" not in t: return
+        if "boss" not in t:
+            return
         if value == "":
             t["boss"][1] = t["boss"][0]
         else:
             t["boss"][1] = value
 
-    def autoSetBossFix(self, options, target, value):
+    def autoSetBossFix(self : GBFTMR, options : dict, target : str, value : str) -> None:
         t = self.getOptionTarget(options, target)
-        if "boss" not in t: return
+        if "boss" not in t:
+            return
         t["boss"][2] = (value == "yes")
 
-    def autoSetAsset(self, options, target, value):
+    def autoSetAsset(self : GBFTMR, options : dict, target : str, value : str) -> None:
         t = self.getOptionTarget(options, target)
         t["asset"] = value
 
-    def autoSetGW(self, options, target, value):
+    def autoSetGW(self : GBFTMR, options : dict, target : str, value : str) -> None:
         t = self.getOptionTarget(options, target)
         t["gwn"] = value
 
-    def autoSetNM(self, options, target, value):
+    def autoSetNM(self : GBFTMR, options : dict, target : str, value : str) -> None:
         t = self.getOptionTarget(options, target)
         if value is None:
             t["asset"] = value
@@ -567,11 +629,11 @@ class GBFTMR():
             else: # gw
                 t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(t["gwn"].zfill(3), t["gwn"].zfill(3), value)
 
-    def autoSetPrideID(self, options, target, value):
+    def autoSetPrideID(self : GBFTMR, options : dict, target : str, value : str) -> None:
         t = self.getOptionTarget(options, target)
         t["pridenum"] = str(value).zfill(3)
 
-    def autoSetPrideDifficulty(self, options, target, value):
+    def autoSetPrideDifficulty(self : GBFTMR, options : dict, target : str, value : str) -> None:
         t = self.getOptionTarget(options, target)
         if value is None:
             t["asset"] = value
@@ -580,7 +642,7 @@ class GBFTMR():
 
     # end of GBFPIB compatibility
 
-    def makeThumbnailManual(self, gbfpib=None):
+    async def makeThumbnailManual(self : GBFTMR, gbfpib=None):
         print("Please select a template:")
         choices = []
         for k in self.template:
@@ -672,7 +734,7 @@ class GBFTMR():
                                 try:
                                     if not s.startswith("http"):
                                         raise Exception()
-                                    self.getAsset(s)
+                                    await self.getAsset(s)
                                     url = s
                                     e["type"] = "asset"
                                     e['asset'] = url
@@ -805,9 +867,9 @@ class GBFTMR():
                 case "textinput":
                     print("Input the '{}'".format(e["ref"]))
                     settings[e["ref"]] = input()
-        self.makeThumbnail(settings, template)
+        await self.makeThumbnail(settings, template)
 
-    def makeThumbnail(self, settings, template):
+    async def makeThumbnail(self : GBFTMR, settings, template):
         if self.classes is None:
             self.loadClasses()
         print("[TMR] |--> Starting thumbnail generation...")
@@ -816,13 +878,13 @@ class GBFTMR():
             print("[TMR] |--> Generating Element #{}: {}".format(i+1, e["type"]))
             match e["type"]:
                 case "background":
-                    img = self.auto_background(img, settings, e)
+                    img = await self.auto_background(img, settings, e)
                 case "boss":
-                    img = self.auto_boss(img, settings, e)
+                    img = await self.auto_boss(img, settings, e)
                 case "party":
-                    img = self.auto_party(img, settings, e)
+                    img = await self.auto_party(img, settings, e)
                 case "asset":
-                    img = self.auto_asset(img, settings, e)
+                    img = await self.auto_asset(img, settings, e)
                 case "textinput":
                     img = self.auto_text(img, settings, e)
         print("[TMR] |--> Saving...")
@@ -831,35 +893,38 @@ class GBFTMR():
         print("[TMR] |--> thumbnail.png has been generated with success")
         self.saveClasses()
 
-    def auto_background(self, img, settings, element):
+    async def auto_background(self : GBFTMR, img, settings, element):
         if 'bg' not in settings: return img
-        bg = self.generateBackground(settings['bg'][0], settings['bg'][1], settings['bg'][2], settings['bg'][3])
-        if bg is None: return img
+        bg = await self.generateBackground(settings['bg'][0], settings['bg'][1], settings['bg'][2], settings['bg'][3])
+        if bg is None:
+            return img
         modified = Image.alpha_composite(img, bg)
         img.close()
         bg.close()
         return modified
 
-    def auto_boss(self, img, settings, element):
+    async def auto_boss(self : GBFTMR, img, settings, element):
         if 'boss' not in settings: return img
-        bg = self.generateBackground(settings['boss'][0], None, settings['boss'][1], settings['boss'][2])
-        if bg is None: return img
+        bg = await self.generateBackground(settings['boss'][0], None, settings['boss'][1], settings['boss'][2])
+        if bg is None:
+            return img
         modified = Image.alpha_composite(img, bg)
         img.close()
         bg.close()
         return modified
 
-    def auto_asset(self, img, settings, element): # auto asset parsing
+    async def auto_asset(self : GBFTMR, img, settings, element): # auto asset parsing
         if element.get("asset", None) is None: return img
         pos = element.get('anchor', 'topleft')
         offset = element.get('position', (0,0))
         ratio = element.get('size', 1.0)
-        img = self.make_img_from_element(img, [element["asset"]], pos, offset, ratio)
+        img = await self.make_img_from_element(img, [element["asset"]], pos, offset, ratio)
         return img
 
-    def auto_text(self, img, settings, element): # auto text parsing
+    def auto_text(self : GBFTMR, img, settings, element): # auto text parsing
         text = settings.get(element['ref'], '')
-        if text == '': return img
+        if text == '':
+            return img
         fc = tuple(element.get('fontcolor', (255, 255, 255)))
         oc = tuple(element.get('outlinecolor', (255, 0, 0)))
         os = element.get('outlinesize', 10)
@@ -873,7 +938,7 @@ class GBFTMR():
         img = self.make_img_from_text(img, text, fc, oc, os, bold, italic, pos, offset, fs, lj, rj)
         return img
 
-    def fix_character_look(self, export, i):
+    def fix_character_look(self : GBFTMR, export : dict, i : int) -> str:
         style = ("" if str(export['cst'][i]) == '1' else "_st{}".format(export['cst'][i])) # style
         if style != "":
             uncap = "01"
@@ -919,7 +984,7 @@ class GBFTMR():
                 case 3710195000: # cidala skin 2
                     if export['ce'][i] == 3: cid = 3040377000 # apply earth cidala
         # SKIN FIX END ##################
-        if cid in self.nullchar: 
+        if cid in self.NULLCHARACTER: 
             if export['ce'][i] == 99:
                 return "{}_{}{}_0{}".format(cid, uncap, style, export['pce'])
             else:
@@ -927,7 +992,7 @@ class GBFTMR():
         else:
             return "{}_{}{}".format(cid, uncap, style)
 
-    def auto_party(self, img, settings, element): # auto party drawing
+    async def auto_party(self : GBFTMR, img : Image, settings : dict, element : dict) -> Image: # auto party drawing
         characters = []
         noskin = element.get("noskin", False)
         mainsummon = element.get("mainsummon", False)
@@ -936,7 +1001,7 @@ class GBFTMR():
             babyl = (len(export['c']) > 5)
             if not mainsummon:
                 if noskin:
-                    characters.append(self.get_mc_job_look(export['pcjs'], export['p']))
+                    characters.append(await self.get_mc_job_look(export['pcjs'], export['p']))
                 else:
                     characters.append(export['pcjs'])
             if babyl: nchara = 12
@@ -960,74 +1025,76 @@ class GBFTMR():
                 else:
                     characters.append("1999999999")
         except Exception as e:
-            print("An error occured while importing a party:", e)
+            print("An error occured while importing a party:")
+            print(self.pexc(e))
             raise Exception("Failed to import party data")
         pos = element.get('anchor', 'topleft')
-        offset = element.get('position', (0,0))
+        offset = v2(*element.get('position', (0,0)))
         ratio = element.get('size', 1.0)
         if mainsummon:
-            img = self.make_img_from_element(img, characters, pos, offset, ratio, "partyicon")
+            img = await self.make_img_from_element(img, characters, pos, offset, ratio, "partyicon")
         elif babyl:
-            img = self.make_img_from_element(img, characters[:4], pos, offset, ratio, "squareicon", (100, 100))
-            img = self.make_img_from_element(img, characters[4:8], pos, self.addTuple(offset, self.mulTuple((0, 100), ratio)), ratio, "squareicon", (100, 100))
-            img = self.make_img_from_element(img, characters[8:12], pos, self.addTuple(offset, self.mulTuple((0, 200), ratio)), ratio, "squareicon", (100, 100))
-            img = self.make_img_from_element(img, characters[12:13], pos, self.addTuple(offset, self.mulTuple((0, 310), ratio)), ratio, "partyicon", (192, 108))
-            img = self.make_img_from_element(img, characters[13:14], pos, self.addTuple(offset, self.mulTuple((208, 310), ratio)), ratio, "partyicon", (192, 108))
+            img = await self.make_img_from_element(img, characters[:4], pos, offset, ratio, "squareicon", v2(100, 100))
+            img = await self.make_img_from_element(img, characters[4:8], pos, offset + v2(0, 100) * ratio, ratio, "squareicon", v2(100, 100))
+            img = await self.make_img_from_element(img, characters[8:12], pos, offset + v2(0, 200) * ratio, ratio, "squareicon", v2(100, 100))
+            img = await self.make_img_from_element(img, characters[12:13], pos, offset + v2(0, 310) * ratio, ratio, "partyicon", v2(192, 108))
+            img = await self.make_img_from_element(img, characters[13:14], pos, offset + v2(208, 310) * ratio, ratio, "partyicon", v2(192, 108))
         else:
-            img = self.make_img_from_element(img, characters[:4], pos, offset, ratio, "partyicon", (78, 142))
-            img = self.make_img_from_element(img, characters[4:6], pos, self.addTuple(offset, self.mulTuple((78*4+15, 0), ratio)), ratio, "partyicon", (78, 142))
-            img = self.make_img_from_element(img, characters[6:7], pos, self.addTuple(offset, self.mulTuple((25, 142+10), ratio)), 0.75*ratio, "partyicon", (280, 160))
-            img = self.make_img_from_element(img, characters[7:8], pos, self.addTuple(offset, self.mulTuple((25+280*0.75+15, 142+10), ratio)), 0.75*ratio, "partyicon", (280, 160))
+            img = await self.make_img_from_element(img, characters[:4], pos, offset, ratio, "partyicon", v2(78, 142))
+            img = await self.make_img_from_element(img, characters[4:6], pos, offset + v2(78*4+15, 0) * ratio, ratio, "partyicon", v2(78, 142))
+            img = await self.make_img_from_element(img, characters[6:7], pos, offset + v2(25, 142+10) * ratio, 0.75*ratio, "partyicon", v2(280, 160))
+            img = await self.make_img_from_element(img, characters[7:8], pos, offset + v2(25+280*0.75+15, 142+10) * ratio, 0.75*ratio, "partyicon", v2(280, 160))
         return img
 
-    def make_img_from_element(self, img, characters = [], pos = "middle", offset = (0, 0), ratio = 1.0, display = "squareicon", fixedsize=None): # draw elements onto an image
+    async def make_img_from_element(self : GBFTMR, img : Image, characters : list[str] = [], pos : str = "middle", offset : v2|tuple = (0, 0), ratio : float = 1.0, display : str = "squareicon", fixedsize : v2|None = None) -> Image: # draw elements onto an image
         modified = img.copy()
         match pos.lower():
             case "topleft":
-                cur_pos = (0, 0)
+                cur_pos = v2(0, 0)
             case "top":
-                cur_pos = (640, 0)
+                cur_pos = v2(640, 0)
             case "topright":
-                cur_pos = (1280, 0)
+                cur_pos = v2(1280, 0)
             case "right":
-                cur_pos = (1280, 360)
+                cur_pos = v2(1280, 360)
             case "bottomright":
-                cur_pos = (1280, 720)
+                cur_pos = v2(1280, 720)
             case "bottom":
-                cur_pos = (640, 720)
+                cur_pos = v2(640, 720)
             case "bottomleft":
-                cur_pos = (0, 720)
+                cur_pos = v2(0, 720)
             case "left":
-                cur_pos = (0, 360)
+                cur_pos = v2(0, 360)
             case "middle":
-                cur_pos = (640, 360)
-        cur_pos = self.addTuple(cur_pos, offset)
+                cur_pos = v2(640, 360)
+        cur_pos = cur_pos + offset
         for c in characters:
-            size, u = self.get_element_size(c, display)
-            if size is None: continue
+            size, path = await self.get_element_size(c, display)
+            if size is None:
+                continue
             if fixedsize is not None:
                 size = fixedsize
-            size = self.mulTuple(size, ratio)
+            size = size * ratio
             match pos.lower():
                 case "topright":
-                    cur_pos = self.addTuple(cur_pos, (-size[0], 0))
+                    cur_pos = cur_pos + (-size[0], 0)
                 case "right":
-                    cur_pos = self.addTuple(cur_pos, (-size[0], 0))
+                    cur_pos = cur_pos + (-size[0], 0)
                 case "bottomright":
-                    cur_pos = self.addTuple(cur_pos, (-size[0], -size[1]))
+                    cur_pos = cur_pos + (-size[0], -size[1])
                 case "bottom":
-                    cur_pos = self.addTuple(cur_pos, (0, -size[1]))
+                    cur_pos = cur_pos + (0, -size[1])
                 case "bottomleft":
-                    cur_pos = self.addTuple(cur_pos, (0, -size[1]))
-            if u.startswith("http"):
-                modified = self.dlAndPasteImage(modified, u, cur_pos, resize=size)
+                    cur_pos = cur_pos + (0, -size[1])
+            if path.startswith("http"):
+                modified = await self.dlAndPasteImage(modified, path, cur_pos, resize=size)
             else:
-                modified = self.pasteImage(modified, u, cur_pos, resize=size)
-            cur_pos = self.addTuple(cur_pos, (size[0], 0))
+                modified = self.pasteImage(modified, path, cur_pos, resize=size)
+            cur_pos = cur_pos + (size[0], 0)
         img.close()
         return modified
 
-    def make_img_from_text(self, img, text = "", fc = (255, 255, 255), oc = (0, 0, 0), os = 10, bold = False, italic = False, pos = "middle", offset = (0, 0), fs = 24, lj = 0, rj = 0): # to draw text into an image
+    def make_img_from_text(self : GBFTMR, img : Image, text : str = "", fc : tuple[int, int, int] = (255, 255, 255), oc : tuple[int, int, int] = (0, 0, 0), os : int = 10, bold : bool = False, italic : bool = False, pos : str = "middle", offset : v2|tuple = (0, 0), fs : int = 24, lj : int = 0, rj : int = 0) -> Image: # to draw text into an image
         text = text.replace('\\n', '\n')
         modified = img.copy()
         d = ImageDraw.Draw(modified, 'RGBA')
@@ -1047,29 +1114,29 @@ class GBFTMR():
         size[1] = int(size[1] * 1.15)
         match pos.lower():
             case "topleft":
-                text_pos = (0, 0)
+                text_pos = v2(0, 0)
             case "top":
-                text_pos = (640-size[0]//2, 0)
+                text_pos = v2(640-size[0]//2, 0)
             case "topright":
-                text_pos = (1280-size[0], 0)
+                text_pos = v2(1280-size[0], 0)
             case "right":
-                text_pos = (1280-size[0], 360-size[1]//2)
+                text_pos = v2(1280-size[0], 360-size[1]//2)
             case "bottomright":
-                text_pos = (1280-size[0], 720-size[1])
+                text_pos = v2(1280-size[0], 720-size[1])
             case "bottom":
-                text_pos = (640-size[0]//2, 720-size[1])
+                text_pos = v2(640-size[0]//2, 720-size[1])
             case "bottomleft":
-                text_pos = (0, 720-size[1])
+                text_pos = v2(0, 720-size[1])
             case "left":
-                text_pos = (0, 360-size[1]//2)
+                text_pos = v2(0, 360-size[1]//2)
             case "middle":
-                text_pos = (640-size[0]//2, 360-size[1]//2)
-        text_pos = self.addTuple(text_pos, offset)
+                text_pos = v2(640-size[0]//2, 360-size[1]//2)
+        text_pos = text_pos + offset
         d.text(text_pos, text, fill=fc, font=font, stroke_width=os, stroke_fill=oc)
         img.close()
         return modified
 
-    def get_element_size(self, c, display): # retrive an element asset and return its size
+    async def get_element_size(self : GBFTMR, c : str, display : str) -> tuple[v2|None, str|None]: # retrive an element asset and return its size
         try:
             if not c.startswith("http"):
                 if c == "1999999999":
@@ -1086,37 +1153,40 @@ class GBFTMR():
                             t = 0
                             if len(c.split("_")) != 4:
                                 try:
-                                    c = self.get_mc_job_look(None, c)
+                                    c = await self.get_mc_job_look(None, c)
                                 except:
                                     t = 4
                         else:
                             t = 4
-                try: u = self.asset_urls[t][self.possible_display.index(display.lower())].format(c)
-                except: u = self.asset_urls[t][self.possible_display.index(display.lower())]
-                if t == 4: u = self.path + u
+                try:
+                    path = self.ASSET_TABLE[t][self.DISPLAY_TABLE.index(display.lower())].format(c)
+                except:
+                    path = self.ASSET_TABLE[t][self.DISPLAY_TABLE.index(display.lower())]
+                if t == 4:
+                    path = self.path + path
             else:
-                u = c
-            if u.startswith("http"):
-                with BytesIO(self.dlImage(u)) as file_jpgdata:
+                path = c
+            if path.startswith("http"):
+                with BytesIO(await self.dlImage(path)) as file_jpgdata:
                     buf = Image.open(file_jpgdata)
-                    size = buf.size
+                    size = v2(*(buf.size))
                     buf.close()
             else:
-                buf = Image.open(u)
-                size = buf.size
+                buf = Image.open(path)
+                size = v2(*(buf.size))
                 buf.close()
-            return size, u
+            return size, path
         except:
             return None, None
 
-    def dlImage(self, url): # download an image (check the cache first)
+    async def dlImage(self : GBFTMR, url): # download an image (check the cache first)
         if url not in self.cache:
             self.checkDiskCache()
             try: # get from disk cache if enabled
                 with open(self.path + "cache/" + base64.b64encode(url.encode('utf-8')).decode('utf-8'), "rb") as f:
                     self.cache[url] = f.read()
             except: # else request it from gbf
-                self.cache[url] = self.getAsset(url)
+                self.cache[url] = await self.getAsset(url)
                 try:
                     with open(self.path + "cache/" + base64.b64encode(url.encode('utf-8')).decode('utf-8'), "wb") as f:
                         f.write(self.cache[url])
@@ -1125,46 +1195,46 @@ class GBFTMR():
                     pass
         return self.cache[url]
 
-    def dlAndPasteImage(self, img, url, offset, resize=None, resizeType="default"): # call dlImage() and pasteImage()
-        with BytesIO(self.dlImage(url)) as file_jpgdata:
+    async def dlAndPasteImage(self : GBFTMR, img, url, offset, resize=None, resizeType="default"): # call dlImage() and pasteImage()
+        with BytesIO(await self.dlImage(url)) as file_jpgdata:
             return self.pasteImage(img, file_jpgdata, offset, resize, resizeType)
 
-    def pasteImage(self, img, file, offset, resize=None, resizeType="default"): # paste an image onto another
+    def pasteImage(self : GBFTMR, img : Image, file : str, offset : v2, resize : v2|None = None, resizeType : str = "default") -> Image: # paste an image onto another
         buffers = [Image.open(file)]
         buffers.append(buffers[-1].convert('RGBA'))
         if resize is not None:
             match resizeType.lower():
                 case "default":
-                    buffers.append(buffers[-1].resize(resize, Image.Resampling.LANCZOS))
+                    buffers.append(buffers[-1].resize(resize.i, Image.Resampling.LANCZOS))
                 case "fit":
                     size = buffers[-1].size
                     mod = min(resize[0]/size[0], resize[1]/size[1])
-                    offset = self.addTuple(offset, (int(resize[0]-size[0]*mod)//2, int(resize[1]-size[1]*mod)//2))
+                    offset = offset + (int(resize[0]-size[0]*mod)//2, int(resize[1]-size[1]*mod)//2)
                     buffers.append(buffers[-1].resize((int(size[0]*mod), int(size[1]*mod)), Image.Resampling.LANCZOS))
                 case "fill":
                     size = buffers[-1].size
                     mod = max(resize[0]/size[0], resize[1]/size[1])
-                    offset = self.addTuple(offset, (int(resize[0]-size[0]*mod)//2, int(resize[1]-size[1]*mod)//2))
+                    offset = offset + (int(resize[0]-size[0]*mod)//2, int(resize[1]-size[1]*mod)//2)
                     buffers.append(buffers[-1].resize((int(size[0]*mod), int(size[1]*mod)), Image.Resampling.LANCZOS))
         size = buffers[-1].size
         if size[0] == img.size[0] and size[1] == img.size[1] and offset[0] == 0 and offset[1] == 0:
             modified = Image.alpha_composite(img, buffers[-1])
         else:
             layer = self.make_canvas((1280, 720))
-            layer.paste(buffers[-1], offset, buffers[-1])
+            layer.paste(buffers[-1], offset.i, buffers[-1])
             modified = Image.alpha_composite(img, layer)
             layer.close()
         for buf in buffers: buf.close()
         del buffers
         return modified
 
-    def search_boss(self, search):
+    def search_boss(self : GBFTMR, search):
         return self._search(search, self.boss)
 
-    def search_stamp(self, search):
+    def search_stamp(self : GBFTMR, search):
         return self._search(search, self.stamp)
 
-    def _search(self, search, target):
+    def _search(self : GBFTMR, search, target):
         s = search.lower().split(" ")
         r = []
         for k in target:
@@ -1174,7 +1244,7 @@ class GBFTMR():
                     break
         return r
 
-    def manageBoss(self):
+    async def manageBoss(self : GBFTMR):
         while True:
             print("")
             print("Boss Management Menu")
@@ -1202,9 +1272,9 @@ class GBFTMR():
                     else:
                         print("Generating preview...")
                         if data[0] is not None:
-                            img = self.generateBackground(*data)
+                            img = await self.generateBackground(*data)
                         else:
-                            img = self.generateBackground(*(self.boss[s]))
+                            img = await self.generateBackground(*(self.boss[s]))
                         if img is None:
                             print("An error occured, aborting...")
                         else:
@@ -1233,7 +1303,7 @@ class GBFTMR():
                         print("Fix is", ("enabled" if self.boss[s][3] else "disabled"), "for", s)
                         self.saveBosses()
                         print("Generating preview...")
-                        img = self.generateBackground(*(self.boss[s]))
+                        img = await self.generateBackground(*(self.boss[s]))
                         if img is None:
                             print("An error occured, aborting...")
                         else:
@@ -1259,7 +1329,7 @@ class GBFTMR():
                 case _:
                     break
 
-    def manageStamp(self):
+    async def manageStamp(self : GBFTMR):
         while True:
             print("")
             print("Stamp Management Menu")
@@ -1278,7 +1348,7 @@ class GBFTMR():
                         print("*", "\n* ".join(r))
                     print(len(r), "positive result(s)")
                 case '1':
-                    self.addStamp()
+                    await self.addStamp()
                 case '2':
                     print("Input the name of a Stamp to delete")
                     s = input()
@@ -1299,34 +1369,35 @@ class GBFTMR():
                 case _:
                     break
 
-    def cmd(self):
-        while True:
-            print("")
-            print("Main Menu")
-            print("[0] Generate Thumbnail")
-            print("[1] Add Boss Fight")
-            print("[2] Manage Boss Fights")
-            print("[3] Manage Stamps")
-            print("[4] Get Boss Bookmark")
-            print("[Any] Quit")
-            s = input()
-            match s:
-                case '0':
-                    self.makeThumbnailManual()
-                case '1':
-                    self.addBoss()
-                case '2':
-                    self.manageBoss()
-                case '3':
-                    self.manageStamp()
-                case '4':
-                    pyperclip.copy("javascript:(function () { let copyListener = event => { document.removeEventListener(\"copy\", copyListener, true); event.preventDefault(); let clipboardData = event.clipboardData; clipboardData.clearData(); clipboardData.setData(\"text/plain\", \"$$boss:\"+(stage.pJsnData.is_boss != null ? stage.pJsnData.is_boss.split(\"_\").slice(2).join(\"_\") : stage.pJsnData.boss.param[0].cjs.split(\"_\")[1])+\"|\"+stage.pJsnData.background.split(\"/\")[4].split(\".\")[0]+\"|\"+stage.pJsnData.boss.param[0].cjs.split(\"_\")[1]); }; document.addEventListener(\"copy\", copyListener, true); document.execCommand(\"copy\"); })();")
-                    print("Bookmark copied!")
-                    print("Make a new bookmark and paste the code in the url field")
-                    print("Use it in battle to retrieve the boss and background data")
-                    print("You can use it to set the boss thumbnail directly")
-                case _:
-                    break
+    async def cli(self : GBFTMR):
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as self.client:
+            while True:
+                print("")
+                print("Main Menu")
+                print("[0] Generate Thumbnail")
+                print("[1] Add Boss Fight")
+                print("[2] Manage Boss Fights")
+                print("[3] Manage Stamps")
+                print("[4] Get Boss Bookmark")
+                print("[Any] Quit")
+                s = input()
+                match s:
+                    case '0':
+                        await self.makeThumbnailManual()
+                    case '1':
+                        await self.addBoss()
+                    case '2':
+                        await self.manageBoss()
+                    case '3':
+                        await self.manageStamp()
+                    case '4':
+                        pyperclip.copy("javascript:(function () { let copyListener = event => { document.removeEventListener(\"copy\", copyListener, true); event.preventDefault(); let clipboardData = event.clipboardData; clipboardData.clearData(); clipboardData.setData(\"text/plain\", \"$$boss:\"+(stage.pJsnData.is_boss != null ? stage.pJsnData.is_boss.split(\"_\").slice(2).join(\"_\") : stage.pJsnData.boss.param[0].cjs.split(\"_\")[1])+\"|\"+stage.pJsnData.background.split(\"/\")[4].split(\".\")[0]+\"|\"+stage.pJsnData.boss.param[0].cjs.split(\"_\")[1]); }; document.addEventListener(\"copy\", copyListener, true); document.execCommand(\"copy\"); })();")
+                        print("Bookmark copied!")
+                        print("Make a new bookmark and paste the code in the url field")
+                        print("Use it in battle to retrieve the boss and background data")
+                        print("You can use it to set the boss thumbnail directly")
+                    case _:
+                        break
 
 if __name__ == "__main__":
-    GBFTMR().cmd()
+    asyncio.run(GBFTMR().cli())
