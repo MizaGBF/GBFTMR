@@ -67,7 +67,7 @@ class v2():
         return (int(self.x), int(self.y))
 
 class GBFTMR():
-    VERSION = (2, 0)
+    VERSION = (2, 1)
     ASSET_TABLE = [ # asset urls used depending on asset type
         [ # 0 leader
             "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}.jpg",
@@ -592,7 +592,7 @@ class GBFTMR():
                     e["type"] = "asset"
                 case "nminput":
                     options["choices"].append(["GW/DB/Record ID", None, None, "template-"+str(i), self.autoSetGW])
-                    options["choices"].append(["NM Setting", ["None", "GW NM90", "GW NM95", "GW NM100", "GW NM150", "GW NM200", "GW NM250", "DB 1*", "DB 2*", "DB 3*", "DB 4*", "DB 5*", "DB UF95", "DB UF135", "DB UF175", "DB Valiant", "Record NM100", "Record NM150"], [None, 90, 95, 100, 150, 200, 250, 1, 2, 3, 4, 5, 11, 12, 13, 20, -100, -150], "template-"+str(i), self.autoSetNM])
+                    options["choices"].append(["NM Setting", ["None", "GW NM90", "GW NM95", "GW NM100", "GW NM150", "GW NM200", "GW NM250", "DB 1*", "DB 2*", "DB 3*", "DB 4*", "DB 5*", "DB UF95", "DB UF135", "DB UF175", "DB UF215", "DB Valiant", "Record NM100", "Record NM150"], [None, 90, 95, 100, 150, 200, 250, 1, 2, 3, 4, 5, 11, 12, 13, 14, 20, -100, -150], "template-"+str(i), self.autoSetNM])
                     e["type"] = "asset"
                 case "prideinput":
                     options["choices"].append(["Pride ID", ["Gilbert", "Nalhe Great Wall", "Violet Knight", "Echidna", "Golden Knight", "White Knight", "Cherub", "Kikuri", "Zwei", "Maxwell", "??? (12)", "??? (12)"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "template-"+str(i), self.autoSetPrideID])
@@ -879,9 +879,10 @@ class GBFTMR():
                     print("[11] DB UF95")
                     print("[12] DB UF135")
                     print("[13] DB UF175")
-                    print("[14] DB Valiant")
-                    print("[15] Record NM100")
-                    print("[16] Record NM150")
+                    print("[14] DB UF215")
+                    print("[15] DB Valiant")
+                    print("[16] Record NM100")
+                    print("[17] Record NM150")
                     print("[Any] Skip")
                     match input():
                         case "0": nm = 90
@@ -898,9 +899,10 @@ class GBFTMR():
                         case "11": nm = 11
                         case "12": nm = 12
                         case "13": nm = 13
-                        case "14": nm = 20
-                        case "15": nm = -100
-                        case "16": nm = -150
+                        case "14": nm = 14
+                        case "15": nm = 20
+                        case "16": nm = -100
+                        case "17": nm = -150
                         case _: nm = None
                     if nm is not None:
                         print("Input a GW / DB / Record ID:")
