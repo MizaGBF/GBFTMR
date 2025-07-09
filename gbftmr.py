@@ -595,7 +595,7 @@ class GBFTMR():
                     options["choices"].append(["NM Setting", ["None", "GW NM90", "GW NM95", "GW NM100", "GW NM150", "GW NM200", "GW NM250", "DB 1*", "DB 2*", "DB 3*", "DB 4*", "DB 5*", "DB UF95", "DB UF135", "DB UF175", "DB UF215", "DB Valiant", "Record NM100", "Record NM150"], [None, 90, 95, 100, 150, 200, 250, 1, 2, 3, 4, 5, 11, 12, 13, 14, 20, -100, -150], "template-"+str(i), self.autoSetNM])
                     e["type"] = "asset"
                 case "prideinput":
-                    options["choices"].append(["Pride ID", ["Gilbert", "Nalhe Great Wall", "Violet Knight", "Echidna", "Golden Knight", "White Knight", "Cherub", "Kikuri", "Zwei", "Maxwell", "Otherworldly Violet Knight", "??? (12)"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "template-"+str(i), self.autoSetPrideID])
+                    options["choices"].append(["Pride ID", ["Gilbert", "Nalhe Great Wall", "Violet Knight", "Echidna", "Golden Knight", "White Knight", "Cherub", "Kikuri", "Zwei", "Maxwell", "Otherworld Violet Knight", "??? (12)"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "template-"+str(i), self.autoSetPrideID])
                     options["choices"].append(["Pride Difficulty", ["Proud", "Proud+"], [False, True], "template-"+str(i), self.autoSetPrideDifficulty])
                     e["type"] = "asset"
                 case "textinput":
@@ -936,7 +936,7 @@ class GBFTMR():
                     print("[8] Kikuri")
                     print("[9] Zwei")
                     print("[10] Maxwell")
-                    print("[11] Otherworldly Violet Knight")
+                    print("[11] Otherworld Violet Knight")
                     print("[Any] Anything Else")
                     pn = input().zfill(3)
                     e["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/quest/assets/free/conquest_{}_proud{}.png".format(str(pn).zfill(3), p)
