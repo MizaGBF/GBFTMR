@@ -8,7 +8,7 @@
 * `pip install -r requirements.txt` to install all the modules.  
 ### Notes  
 * This project is a rework of [GBFTM](https://github.com/MizaGBF/GBFTM).  
-* It's compatible with [GBFPIB](https://github.com/MizaGBF/GBFPIB) version 11.0 or above.  
+* It's compatible with [GBFPIB](https://github.com/MizaGBF/GBFPIB) version 12.0 or above.  
 * Party data must be imported using the GBFPIB bookmark.  
 ### Templates  
 Templates can be set in `template.json`.  

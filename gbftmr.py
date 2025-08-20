@@ -5,6 +5,7 @@ import aiohttp
 from dataclasses import dataclass
 from PIL import Image, ImageFont, ImageDraw
 from io import BytesIO
+from enum import IntEnum
 import traceback
 import pyperclip
 import os
@@ -66,8 +67,14 @@ class v2():
     def i(self : v2) -> tuple[int, int]:
         return (int(self.x), int(self.y))
 
+# General enum
+class PartyMode(IntEnum):
+    normal = 0 # normal parties
+    extended = 1 # 8 man party (Versusia)
+    babyl = 2 # 12 man party (Babyl)
+
 class GBFTMR():
-    VERSION = (2, 2)
+    VERSION = (2, 3)
     ASSET_TABLE = [ # asset urls used depending on asset type
         [ # 0 leader
             "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}.jpg",
@@ -566,153 +573,6 @@ class GBFTMR():
         im_a.close()
         return i
 
-    # GBFPIB compatibility functions
-    # return a list of template
-    def getTemplateList(self : GBFTMR) -> list[str]:
-        return list(self.template.keys())
-
-    # return a list of options
-    def getThumbnailOptions(self : GBFTMR, k : str) -> None|dict:
-        if k not in self.template:
-            return None
-        options = {"template":copy.deepcopy(self.template[k]), "settings":{}, "choices":[]}
-        for i, e in enumerate(options["template"]):
-            match e["type"]:
-                case "background":
-                    options["choices"].append(["Background", ["None"]+list(self.boss.keys()), [None]+list(self.boss.keys()), "settings", self.autoSetBG])
-                case "boss":
-                    options["choices"].append(["Boss ID", None, None, "settings", self.autoSetBoss])
-                    options["choices"].append(["Boss Icon", None, None, "settings", self.autoSetBossIcon])
-                    options["choices"].append(["Boss Name Fix", ["No", "Yes"], ["no", "yes"], "settings", self.autoSetBossFix])
-                case "stamp":
-                    options["choices"].append(["Stamp", ["None"]+list(self.stamp.keys()), [None]+list(self.stamp.keys()), "template-"+str(i), self.autoSetStamp])
-                    e["type"] = "asset"
-                case "autoinput":
-                    options["choices"].append(["Auto Setting", ["Manual", "Auto", "Full Auto", "Full Auto Guard"], [None, "auto.png", "fa.png", "fa_guard.png"], "template-"+str(i), self.autoSetAsset])
-                    e["type"] = "asset"
-                case "nminput":
-                    options["choices"].append(["GW/DB/Record ID", None, None, "template-"+str(i), self.autoSetGW])
-                    options["choices"].append(["NM Setting", ["None", "GW NM90", "GW NM95", "GW NM100", "GW NM150", "GW NM200", "GW NM250", "DB 1*", "DB 2*", "DB 3*", "DB 4*", "DB 5*", "DB UF95", "DB UF135", "DB UF175", "DB UF215", "DB Valiant", "Record NM100", "Record NM150"], [None, 90, 95, 100, 150, 200, 250, 1, 2, 3, 4, 5, 11, 12, 13, 14, 20, -100, -150], "template-"+str(i), self.autoSetNM])
-                    e["type"] = "asset"
-                case "prideinput":
-                    options["choices"].append(["Pride ID", ["Gilbert", "Nalhe Great Wall", "Violet Knight", "Echidna", "Golden Knight", "White Knight", "Cherub", "Kikuri", "Zwei", "Maxwell", "Otherworld Violet Knight", "??? (12)"], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "template-"+str(i), self.autoSetPrideID])
-                    options["choices"].append(["Pride Difficulty", ["Proud", "Proud+"], [False, True], "template-"+str(i), self.autoSetPrideDifficulty])
-                    e["type"] = "asset"
-                case "textinput":
-                    options["choices"].append([e["ref"], None, None, "choices-"+str(len(options["choices"])), self.autoSetText])
-        return options
-
-    # get the target of an option
-    def getOptionTarget(self : GBFTMR, options : dict, target : str) -> str:
-        match target:
-            case "settings":
-                return options["settings"]
-            case _:
-                if target.startswith('choices'):
-                    el = target.split('-')
-                    el[1] = int(el[1])
-                    return options["choices"][el[1]]
-                elif target.startswith('template'):
-                    el = target.split('-')
-                    el[1] = int(el[1])
-                    return options["template"][el[1]]
-
-    # set text
-    def autoSetText(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        t = self.getOptionTarget(options, target)
-        options["settings"][t[0]] = value
-
-    # set background
-    def autoSetBG(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        if value is None:
-            return
-        t = self.getOptionTarget(options, target)
-        data = self.bookmarkString(value)
-        if data[0]is not None:
-            t["bg"] = data
-        else:
-            t["bg"] = self.boss[value]
-
-    # set stamp
-    def autoSetStamp(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        if value is None:
-            return
-        t = self.getOptionTarget(options, target)
-        if value in self.stamp:
-            t["asset"] = self.stamp[value]
-
-    # set boss
-    def autoSetBoss(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        if value == "":
-            return
-        t = self.getOptionTarget(options, target)
-        data = self.bookmarkString(value)
-        if data[0] is not None:
-            t["boss"] = [data[0], data[2], data[3]]
-        elif not value.isdigit() and value in self.boss:
-            t["boss"] = [self.boss[value][0], self.boss[value][2], False]
-        else:
-            t["boss"] = [value, None, False]
-
-    # set boss icon
-    def autoSetBossIcon(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        t = self.getOptionTarget(options, target)
-        if "boss" not in t:
-            return
-        if value == "":
-            t["boss"][1] = t["boss"][0]
-        else:
-            t["boss"][1] = value
-
-    # set boss name fix
-    def autoSetBossFix(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        t = self.getOptionTarget(options, target)
-        if "boss" not in t:
-            return
-        t["boss"][2] = (value == "yes")
-
-    # set other asset
-    def autoSetAsset(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        t = self.getOptionTarget(options, target)
-        t["asset"] = value
-
-    # set GW/DB/Record id
-    def autoSetGW(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        t = self.getOptionTarget(options, target)
-        t["gwn"] = value
-
-    # set GW/DB/Record boss fight
-    def autoSetNM(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        t = self.getOptionTarget(options, target)
-        if value is None:
-            t["asset"] = value
-        else:
-            if value < 0: # record
-                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/common/terra/top/assets/quest/terra{}_hell{}.png".format(t["gwn"].zfill(3), -value)
-            elif value < 10: # db fight
-                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img_low/sp/assets/summon/qm/teamforce{}_star{}.png".format(t["gwn"].zfill(2), value)
-            elif value < 20: # db nm
-                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_strong{}.png".format(t["gwn"].zfill(2), int(value)-10)
-            elif value == 20: # db valiant
-                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/summon/qm/teamforce{}_sp.png".format(t["gwn"].zfill(2))
-            else: # gw
-                t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/event/teamraid{}/assets/thumb/teamraid{}_hell{}.png".format(t["gwn"].zfill(3), t["gwn"].zfill(3), value)
-
-    # set pride ascendant id
-    def autoSetPrideID(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        t = self.getOptionTarget(options, target)
-        t["pridenum"] = str(value).zfill(3)
-
-    # set pride ascendant level (proud, proud+)
-    def autoSetPrideDifficulty(self : GBFTMR, options : dict, target : str, value : str) -> None:
-        t = self.getOptionTarget(options, target)
-        if value is None:
-            t["asset"] = value
-        else:
-            t["asset"] = "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/quest/assets/free/conquest_{}_proud{}.png".format(t["pridenum"], "plus" if value else "")
-
-    # end of GBFPIB compatibility
-
     # generate a thumbnail via command line
     async def makeThumbnailManual(self : GBFTMR, gbfpib=None):
         print("Please select a template:")
@@ -1079,44 +939,51 @@ class GBFTMR():
 
     # add the party to the image
     async def auto_party(self : GBFTMR, img : Image, settings : dict, element : dict) -> Image:
-        characters = []
+        entries = []
         # flags
         noskin = element.get("noskin", False)
         mainsummon = element.get("mainsummon", False)
         # import using gbfpib bookmark
         try:
             export = settings['gbfpib']
-            babyl = (len(export['c']) > 5) # babyl flag
+            skip_zero = False
+            if len(export['c']) > 8:
+                mode = PartyMode.babyl
+                nchara = 12
+                skip_zero = True
+            elif len(export['c']) > 5:
+                mode = PartyMode.extended
+                nchara = 8
+            else:
+                mode = PartyMode.normal
+                nchara = 5
             # retrieve mc
             if not mainsummon:
                 if noskin:
-                    characters.append(await self.get_mc_job_look(export['pcjs'], export['p']))
+                    entries.append(await self.get_mc_job_look(export['pcjs'], export['p']))
                 else:
-                    characters.append(export['pcjs'])
-            # max character count
-            if babyl: nchara = 12
-            else: nchara = 5
-            # iterate over characters and add their file to the list
+                    entries.append(export['pcjs'])
+            # iterate over entries and add their file to the list
             for x in range(0, nchara):
                 if mainsummon:break
-                if babyl and x == 0:
+                if skip_zero and x == 0:
                     continue
                 if x >= len(export['c']) or export['c'][x] is None:
-                    characters.append("3999999999") # add 3999999999 if no character in the list
+                    entries.append("3999999999") # add 3999999999 if no character in the list
                     continue
                 if noskin:
-                    characters.append(self.fix_character_look(export, x))
+                    entries.append(self.fix_character_look(export, x))
                 else:
-                    characters.append(export['ci'][x])
+                    entries.append(export['ci'][x])
             # retrieve summon
             if export['s'][0] is not None:
-                characters.append(export['ss'][0])
+                entries.append(export['ss'][0])
             # retrieve weapon
             if not mainsummon:
                 if export['w'][0] is not None and export['wl'][0] is not None:
-                    characters.append(str(export['w'][0]))
+                    entries.append(str(export['w'][0]))
                 else:
-                    characters.append("1999999999")
+                    entries.append("1999999999")
         except Exception as e:
             print("An error occured while importing a party:")
             print(self.pexc(e))
@@ -1126,18 +993,24 @@ class GBFTMR():
         offset = v2(*element.get('position', (0,0)))
         ratio = element.get('size', 1.0)
         if mainsummon:
-            img = await self.make_img_from_element(img, characters, pos, offset, ratio, "partyicon")
-        elif babyl:
-            img = await self.make_img_from_element(img, characters[:4], pos, offset, ratio, "squareicon", v2(100, 100))
-            img = await self.make_img_from_element(img, characters[4:8], pos, offset + v2(0, 100) * ratio, ratio, "squareicon", v2(100, 100))
-            img = await self.make_img_from_element(img, characters[8:12], pos, offset + v2(0, 200) * ratio, ratio, "squareicon", v2(100, 100))
-            img = await self.make_img_from_element(img, characters[12:13], pos, offset + v2(0, 310) * ratio, ratio, "partyicon", v2(192, 108))
-            img = await self.make_img_from_element(img, characters[13:14], pos, offset + v2(208, 310) * ratio, ratio, "partyicon", v2(192, 108))
+            img = await self.make_img_from_element(img, entries, pos, offset, ratio, "partyicon")
+        elif mode == PartyMode.babyl:
+            img = await self.make_img_from_element(img, entries[:4], pos, offset, ratio, "squareicon", v2(100, 100))
+            img = await self.make_img_from_element(img, entries[4:8], pos, offset + v2(0, 100) * ratio, ratio, "squareicon", v2(100, 100))
+            img = await self.make_img_from_element(img, entries[8:12], pos, offset + v2(0, 200) * ratio, ratio, "squareicon", v2(100, 100))
+            img = await self.make_img_from_element(img, entries[12:13], pos, offset + v2(0, 310) * ratio, ratio, "partyicon", v2(192, 108))
+            img = await self.make_img_from_element(img, entries[13:14], pos, offset + v2(208, 310) * ratio, ratio, "partyicon", v2(192, 108))
+        elif mode == PartyMode.extended:
+            # Note: Elevated by 58 pixels so it fits on most normal party templates
+            img = await self.make_img_from_element(img, entries[:4], pos, offset + v2(47, -58) * ratio, ratio, "squareicon", v2(95, 95))
+            img = await self.make_img_from_element(img, entries[4:9], pos, offset + v2(0, -58+95+10) * ratio, ratio, "squareicon", v2(95, 95))
+            img = await self.make_img_from_element(img, entries[9:10], pos, offset + v2(25, 142+10) * ratio, 0.75*ratio, "partyicon", v2(280, 160))
+            img = await self.make_img_from_element(img, entries[10:11], pos, offset + v2(25+280*0.75+15, 142+10) * ratio, 0.75*ratio, "partyicon", v2(280, 160))
         else:
-            img = await self.make_img_from_element(img, characters[:4], pos, offset, ratio, "partyicon", v2(78, 142))
-            img = await self.make_img_from_element(img, characters[4:6], pos, offset + v2(78*4+15, 0) * ratio, ratio, "partyicon", v2(78, 142))
-            img = await self.make_img_from_element(img, characters[6:7], pos, offset + v2(25, 142+10) * ratio, 0.75*ratio, "partyicon", v2(280, 160))
-            img = await self.make_img_from_element(img, characters[7:8], pos, offset + v2(25+280*0.75+15, 142+10) * ratio, 0.75*ratio, "partyicon", v2(280, 160))
+            img = await self.make_img_from_element(img, entries[:4], pos, offset, ratio, "partyicon", v2(78, 142))
+            img = await self.make_img_from_element(img, entries[4:6], pos, offset + v2(78*4+15, 0) * ratio, ratio, "partyicon", v2(78, 142))
+            img = await self.make_img_from_element(img, entries[6:7], pos, offset + v2(25, 142+10) * ratio, 0.75*ratio, "partyicon", v2(280, 160))
+            img = await self.make_img_from_element(img, entries[7:8], pos, offset + v2(25+280*0.75+15, 142+10) * ratio, 0.75*ratio, "partyicon", v2(280, 160))
         return img
 
     # add element images to our canvas
