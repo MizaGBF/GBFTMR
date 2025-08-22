@@ -74,7 +74,7 @@ class PartyMode(IntEnum):
     babyl = 2 # 12 man party (Babyl)
 
 class GBFTMR():
-    VERSION = (2, 3)
+    VERSION = (2, 4)
     ASSET_TABLE = [ # asset urls used depending on asset type
         [ # 0 leader
             "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}.jpg",
@@ -140,6 +140,7 @@ class GBFTMR():
         self.boss = {} # boss cache
         self.stamp = {} # stamp cache
         self.template = {} # template cache
+        self.fonts = {} # font cache
         # load caches
         self.loadBosses()
         self.loadStamps()
@@ -488,7 +489,7 @@ class GBFTMR():
                 appear.close()
                 appear = tmp
                 # make image (youtube wants 720p thumbnail usually)
-                img = self.make_canvas((1280, 720))
+                img = self.make_canvas()
                 for k in parts: # iterate over parts
                     if fix and k == "name_b": # check name fix, skip name_b if enabled
                         continue
@@ -525,7 +526,7 @@ class GBFTMR():
                         case 'name_vs':
                             offset = ((640 - crop.size[0]) // 2, 450-name_y_off)
                     # add rectangle to our image
-                    layer = self.make_canvas((1280, 720))
+                    layer = self.make_canvas()
                     layer.paste(crop, offset, crop)
                     mod = Image.alpha_composite(img, layer)
                     img.close()
@@ -534,7 +535,7 @@ class GBFTMR():
                     img = mod
                     # add the gradient
                     if (k == 'bg' and k != parts[0]) or (parts[0] == 'bg' and k == 'vs_bg'): # gradient
-                        grad = self.make_canvas((1280, 720))
+                        grad = self.make_canvas()
                         tmp = Image.composite(img, grad, self.mask)
                         img.close()
                         grad.close()
@@ -551,7 +552,7 @@ class GBFTMR():
                         mod = Image.open(img_data)
                         tmp = mod.convert("RGBA")
                         mod.close()
-                        layer = self.make_canvas((1280, 720))
+                        layer = self.make_canvas()
                         layer.paste(tmp, (15, 720-tmp.size[1]-15), tmp) # position, bottom left corner, off 15px
                         tmp.close()
                         tmp = Image.alpha_composite(img, layer)
@@ -566,7 +567,7 @@ class GBFTMR():
             return None
 
     # make a blank image to the specified size (usualy 1280x720)
-    def make_canvas(self : GBFTMR, size) -> Image:
+    def make_canvas(self : GBFTMR, size : tuple[int, int] = (1280, 720)) -> Image:
         i = Image.new('RGB', size, "black")
         im_a = Image.new("L", i.size, "black")
         i.putalpha(im_a)
@@ -811,7 +812,7 @@ class GBFTMR():
         if self.classes is None:
             self.loadClasses()
         print("[TMR] |--> Starting thumbnail generation...")
-        img = self.make_canvas((1280, 720))
+        img = self.make_canvas()
         for i, e in enumerate(template): # iterate over template action again
             print("[TMR] |--> Generating Element #{}: {}".format(i+1, e["type"]))
             match e["type"]:
@@ -875,9 +876,53 @@ class GBFTMR():
         pos = element.get('anchor', 'middle')
         offset = element.get('position', (0, 0))
         fs = element.get('fontsize', 120)
+        ll = element.get('lengthlimit', 0)
+        if ll > 0:
+            max_length = 0
+            for line in text.split("\\n"):
+                max_length = max(len(line), max_length)
+            if max_length > ll:
+                fs = int(fs * (1 - (max_length - ll) / ll))
+        if element.get('multilinelimit', False):
+            nl_count = text.count("\\n")
+            if nl_count > 0:
+                fs = int(fs / (nl_count + 1))
+        if 'maxwidth' in element:
+            # get largest line
+            maxline = ""
+            slen = 0
+            for i, line in enumerate(text.split("\\n")):
+                if len(line) > slen:
+                    maxline = line
+                    index = i
+            # calculate font width
+            font_file = "font"
+            if bold:
+                font_file += "b"
+            if italic:
+                font_file += "i"
+            while True:
+                font = self.get_font(font_file, fs, disable_cache=True)
+                s = font.getbbox(maxline, stroke_width=os)
+                w = s[2] - s[0]
+                if w < element["maxwidth"]:
+                    break
+                else:
+                    fs -= 1
         lj = element.get('ljust', 0)
         rj = element.get('rjust', 0)
-        img = self.make_img_from_text(img, text, fc, oc, os, bold, italic, pos, offset, fs, lj, rj)
+        if element.get('gradient', None) is not None:
+            text_im = self.make_img_from_text_gradient(self.make_canvas(), text, element['gradient'][0], element['gradient'][1], fc, oc, os, bold, italic, pos, offset, fs, lj, rj)
+        else:
+            text_im = self.make_img_from_text(self.make_canvas(), text, fc, oc, os, bold, italic, pos, offset, fs, lj, rj)
+        if element.get('rotate', None) is not None:
+            tmp = text_im
+            if len(element['rotate']) == 2:
+                text_im = tmp.rotate(element['rotate'][0], center=element['rotate'][1], resample=Image.BICUBIC)
+            else:
+                text_im = tmp.rotate(element['rotate'][0], resample=Image.BICUBIC)
+            tmp.close()
+        img.paste(text_im, (0,0), text_im)
         return img
 
     # obtain character look without skin
@@ -1062,25 +1107,47 @@ class GBFTMR():
         img.close()
         return modified
 
-    # add text on the canvas
-    def make_img_from_text(self : GBFTMR, img : Image, text : str = "", fc : tuple[int, int, int] = (255, 255, 255), oc : tuple[int, int, int] = (0, 0, 0), os : int = 10, bold : bool = False, italic : bool = False, pos : str = "middle", offset : v2|tuple = (0, 0), fs : int = 24, lj : int = 0, rj : int = 0) -> Image: # to draw text into an image
-        text = text.replace('\\n', '\n')
-        modified = img.copy()
-        d = ImageDraw.Draw(modified, 'RGBA')
-        font_file = "font"
-        if bold: font_file += "b"
-        if italic: font_file += "i"
-        font = ImageFont.truetype(self.path + "assets/" + font_file + ".ttf", fs, encoding="unic")
+    # retrieve font from cache or load it
+    def get_font(self : GBFTMR, font_file : str, font_size : int, *, disable_cache : bool = False) -> ImageFont:
+        key = (font_file, font_size)
+        if key not in self.fonts:
+            if disable_cache:
+                return ImageFont.truetype(self.path + "assets/" + font_file + ".ttf", font_size, encoding="unic")
+            else:
+                self.fonts[key] = ImageFont.truetype(self.path + "assets/" + font_file + ".ttf", font_size, encoding="unic")
+        return self.fonts[key]
+
+    # generate a gradient (for texts)
+    def generate_gradient(self : GBFTMR, position : v2, size : list[int], gcol1 : tuple[int, int, int], gcol2 : tuple[int, int, int]) -> Image:
+        img = self.make_canvas()
+        px = img.load()
+        for y in range(0, size[1]):
+            color = tuple(int(gcol1[i] + (gcol2[i] - gcol1[i]) * y / size[1]) for i in range(3))
+            try:
+                for x in range(0, size[0]):
+                    px[position.x + x, position.y + y] = color
+            except:
+                pass
+        return img
+
+    # apply justifications and calculate bounds
+    def generate_text(self : GBFTMR, text : str, font : ImageFont, fs : int, os : int, lj : int, rj : int) -> tuple[str, list[int]]:
         nl = text.split('\n')
         size = [0, 0]
         for i in range(len(nl)):
-            if lj > 0: nl[i] = nl[i].ljust(lj)
-            if rj > 0: nl[i] = nl[i].rjust(rj)
+            if lj > 0:
+                nl[i] = nl[i].ljust(lj)
+            if rj > 0:
+                nl[i] = nl[i].rjust(rj)
             s = font.getbbox(nl[i], stroke_width=os)
-            size[0] = max(size[0], s[2]-s[0])
-            size[1] += s[3]-s[1] + 10
-        text = '\n'.join(nl)
+            size[0] = max(size[0], s[2] - s[0])
+            size[1] += s[3] - s[1] + 10
+        # adjust
         size[1] = int(size[1] * 1.15)
+        return '\n'.join(nl), size
+
+    # get a text position on screen
+    def get_text_position(self : GBFTMR, pos : str, size : list[int], offset : v2|tuple = (0, 0)) -> v2:
         match pos.lower():
             case "topleft":
                 text_pos = v2(0, 0)
@@ -1100,7 +1167,76 @@ class GBFTMR():
                 text_pos = v2(0, 360-size[1]//2)
             case "middle":
                 text_pos = v2(640-size[0]//2, 360-size[1]//2)
-        text_pos = text_pos + offset
+        return text_pos + offset
+
+    # add text on the canvas with gradient color
+    def make_img_from_text_gradient(
+        self : GBFTMR,
+        img : Image,
+        text : str = "",
+        gcol1 : tuple[int, int, int] = (255, 255, 255),
+        gcol2 : tuple[int, int, int] = (255, 255, 255),
+        fc : tuple[int, int, int] = (255, 255, 255),
+        oc : tuple[int, int, int] = (0, 0, 0),
+        os : int = 10,
+        bold : bool = False,
+        italic : bool = False,
+        pos : str = "middle",
+        offset : v2|tuple = (0, 0),
+        fs : int = 24,
+        lj : int = 0,
+        rj : int = 0
+    ) -> Image: # to draw text into an image
+        # generate mask
+        img_text = self.make_canvas()
+        img_text = self.make_img_from_text(img_text, text, (255, 255, 255), (0, 0, 0, 0), os, bold, italic, pos, offset, fs, lj, rj)
+        # get text size and position
+        font_file = "font"
+        if bold:
+            font_file += "b"
+        if italic:
+            font_file += "i"
+        font = self.get_font(font_file, fs)
+        _, size = self.generate_text(text.replace('\\n', '\n'), font, fs, os, lj, rj)
+        text_pos = self.get_text_position(pos, size, offset)
+        # generate a gradient
+        grad = self.generate_gradient(text_pos, size, gcol1, gcol2)
+        # draw text with outline
+        img = self.make_img_from_text(img, text, fc, oc, os, bold, italic, pos, offset, fs, lj, rj)
+        # paste gradient with text mask on top
+        img.paste(grad, (0, 0), img_text)
+        # cleanup
+        grad.close()
+        img_text.close()
+        return img
+
+    # add text on the canvas
+    def make_img_from_text(
+        self : GBFTMR,
+        img : Image,
+        text : str = "",
+        fc : tuple[int, int, int] = (255, 255, 255),
+        oc : tuple[int, int, int] = (0, 0, 0),
+        os : int = 10,
+        bold : bool = False,
+        italic : bool = False,
+        pos : str = "middle",
+        offset : v2|tuple = (0, 0),
+        fs : int = 24,
+        lj : int = 0,
+        rj : int = 0
+    ) -> Image: # to draw text into an image
+        text = text.replace('\\n', '\n')
+        modified = img.copy()
+        d = ImageDraw.Draw(modified, 'RGBA')
+        font_file = "font"
+        if bold:
+            font_file += "b"
+        if italic:
+            font_file += "i"
+        font = self.get_font(font_file, fs)
+        text, size = self.generate_text(text, font, fs, os, lj, rj)
+        text_pos = self.get_text_position(pos, size, offset)
         d.text(text_pos, text, fill=fc, font=font, stroke_width=os, stroke_fill=oc)
         img.close()
         return modified

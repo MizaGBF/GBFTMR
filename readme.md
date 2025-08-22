@@ -32,13 +32,17 @@ For `party`:
   
 For `textinput`:
 * `fontcolor`: Array of 3 or 4 integers (RGB or RGBA values), color of the text (Default is white)  
+* `gradient`: An array of 2 colors (array of 3 or 4 integers each for RGB or RGBA values), to color the text from top to bottom. It overrides `fontcolor`.
 * `outlinecolor`: Array of 3 or 4 integers (RGB or RGBA values), color of the text outline (Default is red)  
 * `fontsize`: Integer, text size (Default is 120)  
 * `outlinesize`: Integer, size of the text outline (Default is 10)  
 * `bold`: Boolean, set to True to draw bold text  
 * `italic`: Boolean, set to True to draw italic text  
-* `ljust`: Integer, to left align string lines   
-* `rjust`: Integer, to right align string lines (Applied after `ljust`, if set)   
+* `ljust`: Integer, to left align string lines  
+* `rjust`: Integer, to right align string lines (Applied after `ljust`, if set)  
+* `rotate`: An array of one or two elements: The angle (Integer, in degree) and an optional array of 2 integers (the rotation center).
+* `maxwidth`: Integer, the maximum width of the text in pixel. The font size will auto reduce as long as it's higher.
+* `multilinelimit`: Boolean, the font size will reduce if `true` and `\n` are found in the text.
   
 ### Bosses  
 Bosses can be set in `boss.json`.  
