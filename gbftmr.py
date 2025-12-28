@@ -74,7 +74,7 @@ class PartyMode(IntEnum):
     babyl = 2 # 12 man party (Babyl)
 
 class GBFTMR():
-    VERSION = (2, 4)
+    VERSION = (2, 5)
     ASSET_TABLE = [ # asset urls used depending on asset type
         [ # 0 leader
             "https://prd-game-a1-granbluefantasy.akamaized.net/assets_en/img/sp/assets/leader/s/{}.jpg",
@@ -498,7 +498,10 @@ class GBFTMR():
                     # different behavior based on part name:
                     match k:
                         case 'boss'|'opq_boss': # resize the boss to fit the image vertically, and put it on the left
-                            mod = min(720/crop.size[0], 720/crop.size[1])
+                            if parts == ["boss", "name_a"]: # exception for odious bosses
+                                mod = min(720/crop.size[0], 720/668) # 668 is standard size
+                            else:
+                                mod = min(720/crop.size[0], 720/crop.size[1])
                             tmp = crop.resize((int(crop.size[0]*mod), int(crop.size[1]*mod)), Image.Resampling.LANCZOS)
                             crop.close()
                             crop = tmp
@@ -518,7 +521,10 @@ class GBFTMR():
                         case 'en':
                             offset = ((640 - crop.size[0]) // 2, 540-name_y_off)
                         case 'name_a'|'opq_name_a':
-                            offset = ((640 - crop.size[0]) // 2, 450-name_y_off)
+                            if parts == ["boss", "name_a"]: # exception for odious bosses
+                                offset = ((640 - crop.size[0]) // 2, 450-name_y_off//2)
+                            else:
+                                offset = ((640 - crop.size[0]) // 2, 450-name_y_off)
                         case 'name_b':
                             offset = ((640 - crop.size[0]) // 2, 490-name_y_off)
                         case 'boss_a':
@@ -534,7 +540,11 @@ class GBFTMR():
                     crop.close()
                     img = mod
                     # add the gradient
-                    if (k == 'bg' and k != parts[0]) or (parts[0] == 'bg' and k == 'vs_bg'): # gradient
+                    if (
+                        (k == 'bg' and k != parts[0]) or
+                        (parts[0] == 'bg' and k == 'vs_bg') or
+                        (k == 'name_a' and parts == ["boss", "name_a"]) # odious
+                            ): # gradient
                         grad = self.make_canvas()
                         tmp = Image.composite(img, grad, self.mask)
                         img.close()
